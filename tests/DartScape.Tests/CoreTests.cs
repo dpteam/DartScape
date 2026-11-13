@@ -41,10 +41,37 @@ namespace DartScape.Tests
                 buffer.WriteByte(0x12);
                 buffer.WriteByteS(0x34);
                 buffer.WriteByteC(0x56);
+                buffer.WriteByteA(0x78);
 
                 Harness.Equal(0x12, buffer.ReadUnsignedByte(), "plain byte");
                 Harness.Equal(0x34, buffer.ReadUnsignedByteS(), "offset byte");
                 Harness.Equal(0x56, buffer.ReadUnsignedByteC(), "negated byte");
+                Harness.Equal(0x78, buffer.ReadUnsignedByteA(), "add byte");
+            });
+
+            Harness.Test("every byte variant round-trips across the whole range", () =>
+            {
+                // The skills packet is written with WriteByteA and read with
+                // ReadUnsignedByteA. When those two disagreed by 128, every stat showed
+                // as level 129. A range check catches that class of mismatch.
+                for (int value = 0; value <= 255; value++)
+                {
+                    var buffer = new PacketBuffer(8);
+
+                    buffer.WriteByteA(value);
+                    buffer.ReadPosition = 0;
+                    Harness.Equal(value, buffer.ReadUnsignedByteA(), "add byte " + value);
+
+                    buffer.Reset();
+                    buffer.WriteByteS(value);
+                    buffer.ReadPosition = 0;
+                    Harness.Equal(value, buffer.ReadUnsignedByteS(), "offset byte " + value);
+
+                    buffer.Reset();
+                    buffer.WriteByteC(value);
+                    buffer.ReadPosition = 0;
+                    Harness.Equal(value, buffer.ReadUnsignedByteC(), "negated byte " + value);
+                }
             });
 
             Harness.Test("short and int variants round-trip", () =>

@@ -42,14 +42,160 @@ namespace DartScape.Client.Rendering
             _bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
             _data = _bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
             _scan0 = _data.Scan0;
+
+            ResetClip();
         }
 
         public int Width { get; private set; }
 
         public int Height { get; private set; }
 
+        // Clip rectangle, inclusive-exclusive. Everything respects it, so the world
+        // renderer can draw a scene into its own viewport without spilling into the
+        // chat box or the sidebar.
+        private int _clipX;
+        private int _clipY;
+        private int _clipRight;
+        private int _clipBottom;
+
         [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory", SetLastError = false)]
         private static extern unsafe void CopyMemory(void* destination, void* source, long length);
+
+        /// <summary>Restricts drawing to a rectangle. Values are clamped to the buffer.</summary>
+        public void SetClip(int x, int y, int width, int height)
+        {
+            _clipX = Math.Max(0, x);
+            _clipY = Math.Max(0, y);
+            _clipRight = Math.Min(Width, x + width);
+            _clipBottom = Math.Min(Height, y + height);
+        }
+
+        /// <summary>Removes the clip, allowing drawing over the whole buffer.</summary>
+        public void ResetClip()
+        {
+            _clipX = 0;
+            _clipY = 0;
+            _clipRight = Width;
+            _clipBottom = Height;
+        }
+
+        /// <summary>Fills one horizontal run, honouring the clip.</summary>
+        public void FillSpan(int x0, int x1, int y, int argb)
+        {
+            if (y < _clipY || y >= _clipBottom) return;
+
+            int from = Math.Max(x0, _clipX);
+            int to = Math.Min(x1, _clipRight);
+            if (to <= from) return;
+
+            int row = y * Width;
+            for (int x = from; x < to; x++) _pixels[row + x] = argb;
+        }
+
+        /// <summary>
+        /// Fills a diamond, the shape of one isometric tile.
+        /// </summary>
+        /// <remarks>
+        /// Scanline spans rather than per-pixel tests: a tile is a solid convex shape, so
+        /// each row is one contiguous run. At roughly 700 tiles per frame this is the
+        /// difference between 50 fps and a slideshow.
+        /// </remarks>
+        public void FillDiamond(int cx, int cy, int halfWidth, int halfHeight, int argb)
+        {
+            if (halfWidth <= 0 || halfHeight <= 0) return;
+
+            for (int dy = -halfHeight; dy <= halfHeight; dy++)
+            {
+                int y = cy + dy;
+                if (y < _clipY || y >= _clipBottom) continue;
+
+                // Width shrinks linearly towards the top and bottom points.
+                int span = (int)((long)halfWidth * (halfHeight - Math.Abs(dy)) / halfHeight);
+                if (span <= 0) continue;
+
+                FillSpan(cx - span, cx + span, y, argb);
+            }
+        }
+
+        /// <summary>Fills a convex quad given four corner points.</summary>
+        public void FillQuad(int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3, int argb)
+        {
+            int top = Math.Min(Math.Min(y0, y1), Math.Min(y2, y3));
+            int bottom = Math.Max(Math.Max(y0, y1), Math.Max(y2, y3));
+
+            if (top < _clipY) top = _clipY;
+            if (bottom >= _clipBottom) bottom = _clipBottom - 1;
+
+            for (int y = top; y <= bottom; y++)
+            {
+                int left = int.MaxValue;
+                int right = int.MinValue;
+
+                ScanEdge(x0, y0, x1, y1, y, ref left, ref right);
+                ScanEdge(x1, y1, x2, y2, y, ref left, ref right);
+                ScanEdge(x2, y2, x3, y3, y, ref left, ref right);
+                ScanEdge(x3, y3, x0, y0, y, ref left, ref right);
+
+                if (left > right) continue;
+                FillSpan(left, right, y, argb);
+            }
+        }
+
+        /// <summary>
+        /// Fills a triangle with flat shading.
+        /// </summary>
+        /// <remarks>
+        /// A terrain tile whose four corners are at different elevations is not planar, so
+        /// it is split into two triangles. Each gets its own shade derived from its own
+        /// slope, which is what produces the faceted, lit-from-one-side look of a heightfield
+        /// rather than a smooth gradient that reads as a decal.
+        /// </remarks>
+        public void FillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int argb)
+        {
+            int top = Math.Min(y0, Math.Min(y1, y2));
+            int bottom = Math.Max(y0, Math.Max(y1, y2));
+
+            if (top < _clipY) top = _clipY;
+            if (bottom >= _clipBottom) bottom = _clipBottom - 1;
+
+            for (int y = top; y <= bottom; y++)
+            {
+                int left = int.MaxValue;
+                int right = int.MinValue;
+
+                ScanEdge(x0, y0, x1, y1, y, ref left, ref right);
+                ScanEdge(x1, y1, x2, y2, y, ref left, ref right);
+                ScanEdge(x2, y2, x0, y0, y, ref left, ref right);
+
+                if (left > right) continue;
+                FillSpan(left, right, y, argb);
+            }
+        }
+
+        /// <summary>Intersects one quad edge with a scanline and widens the span.</summary>
+        private static void ScanEdge(int ax, int ay, int bx, int by, int y, ref int left, ref int right)
+        {
+            if (ay == by)
+            {
+                // Horizontal edge: it contributes its whole extent on this row.
+                if (y != ay) return;
+                if (ax < left) left = ax;
+                if (bx < left) left = bx;
+                if (ax > right) right = ax;
+                if (bx > right) right = bx;
+                return;
+            }
+
+            int minY = Math.Min(ay, by);
+            int maxY = Math.Max(ay, by);
+            if (y < minY || y > maxY) return;
+
+            // Integer interpolation is exact enough here and avoids a float per pixel.
+            int x = ax + (int)((long)(bx - ax) * (y - ay) / (by - ay));
+
+            if (x < left) left = x;
+            if (x > right) right = x;
+        }
 
         /// <summary>The raw pixel array. Direct access for the hot paths.</summary>
         public int[] Pixels
@@ -63,13 +209,13 @@ namespace DartScape.Client.Rendering
             for (int i = 0; i < _pixels.Length; i++) _pixels[i] = argb;
         }
 
-        /// <summary>Fills a rectangle, clipped to the buffer.</summary>
+        /// <summary>Fills a rectangle, clipped to the buffer and the current clip.</summary>
         public void FillRect(int x, int y, int width, int height, int argb)
         {
-            int x0 = Math.Max(0, x);
-            int y0 = Math.Max(0, y);
-            int x1 = Math.Min(Width, x + width);
-            int y1 = Math.Min(Height, y + height);
+            int x0 = Math.Max(_clipX, x);
+            int y0 = Math.Max(_clipY, y);
+            int x1 = Math.Min(_clipRight, x + width);
+            int y1 = Math.Min(_clipBottom, y + height);
             if (x1 <= x0 || y1 <= y0) return;
 
             for (int py = y0; py < y1; py++)
@@ -97,13 +243,14 @@ namespace DartScape.Client.Rendering
             for (int dy = -radius; dy <= radius; dy++)
             {
                 int y = cy + dy;
-                if (y < 0 || y >= Height) continue;
+                if (y < _clipY || y >= _clipBottom) continue;
 
                 int span = (int)Math.Sqrt(r2 - dy * dy);
-                int x0 = Math.Max(0, cx - span);
-                int x1 = Math.Min(Width - 1, cx + span);
-                int row = y * Width;
+                int x0 = Math.Max(_clipX, cx - span);
+                int x1 = Math.Min(_clipRight - 1, cx + span);
+                if (x1 < x0) continue;
 
+                int row = y * Width;
                 for (int x = x0; x <= x1; x++) _pixels[row + x] = argb;
             }
         }
@@ -114,7 +261,7 @@ namespace DartScape.Client.Rendering
         /// </summary>
         public void BlendPixel(int x, int y, int argb)
         {
-            if (x < 0 || y < 0 || x >= Width || y >= Height) return;
+            if (x < _clipX || y < _clipY || x >= _clipRight || y >= _clipBottom) return;
 
             int alpha = (argb >> 24) & 0xFF;
             if (alpha == 255) { _pixels[y * Width + x] = argb; return; }
@@ -138,10 +285,10 @@ namespace DartScape.Client.Rendering
             if (alpha == 0) return;
             if (alpha == 255) { FillRect(x, y, width, height, argb); return; }
 
-            int x0 = Math.Max(0, x);
-            int y0 = Math.Max(0, y);
-            int x1 = Math.Min(Width, x + width);
-            int y1 = Math.Min(Height, y + height);
+            int x0 = Math.Max(_clipX, x);
+            int y0 = Math.Max(_clipY, y);
+            int x1 = Math.Min(_clipRight, x + width);
+            int y1 = Math.Min(_clipBottom, y + height);
 
             for (int py = y0; py < y1; py++)
             {
@@ -269,6 +416,25 @@ namespace DartScape.Client.Rendering
             graphics.DrawImage(_bitmap, new Rectangle(0, 0, destinationWidth, destinationHeight));
 
             // Re-lock for the next frame.
+            _bitmap.LockBits(new Rectangle(0, 0, Width, Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+        }
+
+        /// <summary>Writes the framebuffer to a PNG, for the offline render mode and CI.</summary>
+        public void SavePng(string path)
+        {
+            if (_disposed) return;
+
+            unsafe
+            {
+                fixed (int* source = _pixels)
+                {
+                    long bytes = (long)Width * Height * 4;
+                    CopyMemory((void*)_scan0, source, bytes);
+                }
+            }
+
+            _bitmap.UnlockBits(_data);
+            _bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
             _bitmap.LockBits(new Rectangle(0, 0, Width, Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
         }
 

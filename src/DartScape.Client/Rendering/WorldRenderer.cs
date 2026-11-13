@@ -1,430 +1,409 @@
 ﻿using System;
 using System.Collections.Generic;
-using DartScape.Client.Rendering;
 
 namespace DartScape.Client.Rendering
 {
     /// <summary>
-    /// Draws the world: terrain, entities, ground items and overhead text.
+    /// Draws the world as an isometric heightfield: tiles built from four corner heights,
+    /// split into triangles and shaded by slope, with props and entities sorted back to
+    /// front.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The view is a top-down tile grid with billboarded entities. That is a deliberate
-    /// simplification of the original's 3D scene: it needs no model data, no texture
-    /// archive and no camera maths, so it runs on any XP-era machine and it is honest
-    /// about what it is. The scene pipeline in <c>docs/PIPELINE.md</c> describes what has
-    /// to be built to replace it.
+    /// Each tile is drawn from its four corners, not from a single height. That is what makes
+    /// hills roll: a corner is shared between four tiles, so the ground is continuous and a
+    /// slope is a real ramp rather than a staircase.
     /// </para>
     /// <para>
-    /// Terrain colour is derived from a deterministic hash of the tile coordinate, which
-    /// produces stable, plausible grass/dirt/water patches without shipping a map file.
-    /// The same hash is used by the minimap, so the two always agree.
+    /// Drawing order is the whole trick. Tiles are walked by increasing (viewX + viewY),
+    /// which is exactly back to front for an isometric camera, and within a row from left to
+    /// right. Entities are collected during the tile pass and drawn with the tile they stand
+    /// on, so a character behind a hill is occluded by it.
     /// </para>
     /// </remarks>
     public sealed class WorldRenderer
-    {
-        /// <summary>Pixels per tile.</summary>
-        public const int TileSize = 32;
-
-        private readonly FontRenderer _text;
-
-        private static readonly int GrassDark = Framebuffer.Rgb(58, 94, 42);
-        private static readonly int GrassLight = Framebuffer.Rgb(74, 116, 52);
-        private static readonly int Dirt = Framebuffer.Rgb(120, 98, 62);
-        private static readonly int DirtDark = Framebuffer.Rgb(100, 80, 50);
-        private static readonly int Water = Framebuffer.Rgb(44, 78, 122);
-        private static readonly int WaterLight = Framebuffer.Rgb(58, 96, 146);
-        private static readonly int Stone = Framebuffer.Rgb(112, 112, 118);
-        private static readonly int Sand = Framebuffer.Rgb(178, 160, 108);
+    {private readonly FontRenderer _text;
 
         public WorldRenderer(FontRenderer text)
         {
             _text = text;
         }
 
-        /// <summary>Terrain type at a world tile. Stable for a given coordinate.</summary>
-        public enum Terrain
-        {
-            Grass = 0,
-            Dirt = 1,
-            Water = 2,
-            Stone = 3,
-            Sand = 4
-        }
-
-        /// <summary>Deterministic terrain lookup, shared by the world view and the minimap.</summary>
-        public static Terrain TerrainAt(int x, int y)
-        {
-            // A cheap integer hash with a low-frequency component so patches are large
-            // enough to look like terrain rather than noise.
-            uint h = (uint)(x * 73856093) ^ (uint)(y * 19349663);
-            h ^= h >> 13;
-            h *= unchecked((int)0x5bd1e995);
-            h ^= h >> 15;
-
-            int coarse = (int)(h & 0xFF);
-
-            // Water along the edges of a large region, so the map reads as a place.
-            int regionX = ((x % 128) + 128) % 128;
-            int regionY = ((y % 128) + 128) % 128;
-            if (regionX < 6 || regionY < 6 || regionX > 121 || regionY > 121) return Terrain.Water;
-
-            if (coarse < 12) return Terrain.Dirt;
-            if (coarse < 18) return Terrain.Stone;
-            if (coarse < 22) return Terrain.Sand;
-            return Terrain.Grass;
-        }
-
-        private static int ColourFor(Terrain terrain, int x, int y)
-        {
-            // A per-tile shade wobble keeps large flat areas from looking like a texture bug.
-            int wobble = (int)(((x * 31 + y * 17) & 3) - 1) * 4;
-
-            switch (terrain)
-            {
-                case Terrain.Dirt:
-                    return Shift(Dirt, wobble);
-                case Terrain.Water:
-                    return Shift(WaterLight, wobble / 2);
-                case Terrain.Stone:
-                    return Shift(Stone, wobble);
-                case Terrain.Sand:
-                    return Shift(Sand, wobble);
-                default:
-                    return Shift((x + y) % 2 == 0 ? GrassDark : GrassLight, wobble);
-            }
-        }
-
-        private static int Shift(int argb, int amount)
-        {
-            int r = Math.Max(0, Math.Min(255, ((argb >> 16) & 0xFF) + amount));
-            int g = Math.Max(0, Math.Min(255, ((argb >> 8) & 0xFF) + amount));
-            int b = Math.Max(0, Math.Min(255, (argb & 0xFF) + amount));
-            return Framebuffer.Rgb(r, g, b);
-        }
-
-        /// <summary>Draws the world view into <paramref name="target"/>.</summary>
+        /// <summary>Draws the scene.</summary>
         public void Draw(Framebuffer target, ClientWorld world, int viewX, int viewY, int viewWidth, int viewHeight,
             double interpolation)
         {
             if (target == null || world == null) return;
 
-            // Centre the camera on the player, offset by the camera nudge.
-            double cameraX = world.MyX + world.CameraOffsetX;
-            double cameraY = world.MyY + world.CameraOffsetY;
+            target.SetClip(viewX, viewY, viewWidth, viewHeight);
 
-            int tilesX = viewWidth / TileSize + 3;
-            int tilesY = viewHeight / TileSize + 3;
+            // Sky. Only visible above the horizon where no terrain covers it.
+            target.FillRect(viewX, viewY, viewWidth, viewHeight, Framebuffer.Rgb(30, 44, 64));
 
-            int originTileX = (int)Math.Floor(cameraX) - tilesX / 2;
-            int originTileY = (int)Math.Floor(cameraY) - tilesY / 2;
+            // The camera sits on the player's tile, and the player's own elevation lifts them
+            // up the screen. Adding that lift to the origin keeps the player centred instead
+            // of drifting towards the top of the view whenever they stand on a hill.
+            int cameraHeight = Terrain.RenderHeight(world.MyX + world.CameraOffsetX,
+                world.MyY + world.CameraOffsetY);
 
-            // The fractional part of the camera position becomes a sub-tile offset, which
-            // is what makes walking look smooth instead of one tile per 600 ms.
-            double fracX = cameraX - Math.Floor(cameraX);
-            double fracY = cameraY - Math.Floor(cameraY);
-
-            int originPixelX = viewX - (int)(fracX * TileSize);
-            int originPixelY = viewY - (int)(fracY * TileSize);
-
-            // --- terrain ------------------------------------------------------
-            for (int ty = 0; ty < tilesY; ty++)
+            var projection = new IsoProjection
             {
-                for (int tx = 0; tx < tilesX; tx++)
+                OriginX = viewX + viewWidth / 2,
+                OriginY = viewY + viewHeight / 2 + cameraHeight * IsoProjection.HeightStep,
+                CameraX = world.MyX + world.CameraOffsetX,
+                CameraY = world.MyY + world.CameraOffsetY,
+                Rotation = world.CameraRotation
+            };
+
+            List<EntityDrawable> entities = CollectEntities(world, interpolation);
+
+            // --- visible tile range -------------------------------------------
+            // A tile at view offset (vx, vy) lands at ((vx-vy)*HalfWidth, (vx+vy)*HalfHeight).
+            // Inverting that against the viewport half-extents gives the exact range worth
+            // walking, which at this size is about a tenth of a fixed radius.
+            int halfW = viewWidth / 2;
+            int halfH = viewHeight / 2;
+
+            // Extra rows so tall terrain at the edge still has its walls drawn.
+            int spanA = halfW / IsoProjection.HalfWidth + 2;          // |vx - vy|
+            int spanB = halfH / IsoProjection.HalfHeight + 8;         // |vx + vy|
+
+            // --- terrain pass, back to front ---------------------------------
+            for (int sum = -spanB; sum <= spanB; sum++)
+            {
+                for (int vx = -spanA; vx <= spanA; vx++)
                 {
-                    int worldX = originTileX + tx;
-                    int worldY = originTileY + ty;
+                    int vy = sum - vx;
+                    if (vy < -spanA || vy > spanA) continue;
 
-                    Terrain terrain = TerrainAt(worldX, worldY);
-                    int colour = ColourFor(terrain, worldX, worldY);
-
-                    int px = originPixelX + tx * TileSize;
-                    int py = originPixelY + ty * TileSize;
-
-                    if (px > viewX + viewWidth || py > viewY + viewHeight) continue;
-                    if (px + TileSize < viewX || py + TileSize < viewY) continue;
-
-                    target.FillRect(px, py, TileSize, TileSize, colour);
-
-                    // A one-pixel darker edge gives the grid definition without looking
-                    // like a debug overlay.
-                    if (terrain == Terrain.Water)
-                    {
-                        target.FillRect(px, py, TileSize, 1, Shift(colour, 12));
-                    }
-                    else
-                    {
-                        target.FillRect(px, py + TileSize - 1, TileSize, 1, Shift(colour, -10));
-                    }
+                    DrawTile(target, world, projection, vx, vy, entities);
                 }
             }
 
-            // --- ground items -------------------------------------------------
-            for (int i = 0; i < world.GroundItems.Count; i++)
-            {
-                ClientGroundItem item = world.GroundItems[i];
-                if (item.Plane != world.MyPlane) continue;
+            target.ResetClip();
+        }
 
-                int px = WorldToScreenX(item.X, item.Y, originTileX, originTileY, originPixelX, originPixelY);
-                int py = WorldToScreenY(item.X, item.Y, originTileX, originTileY, originPixelX, originPixelY);
-
-                if (!Visible(px, py, viewX, viewY, viewWidth, viewHeight, 40)) continue;
-
-                // A small gold diamond, readable at a glance and obviously "an item".
-                int cx = px + TileSize / 2;
-                int cy = py + TileSize / 2;
-
-                target.FillCircle(cx, cy + 6, 4, Framebuffer.Argb(90, 0, 0, 0));
-                DrawDiamond(target, cx, cy, 6, Framebuffer.Rgb(226, 190, 90));
-
-                if (item.Amount > 1)
-                {
-                    _text.Draw(target, item.Amount.ToString(), cx + 6, cy - 6, unchecked((int)0xFFFFFF00), FontRenderer.Size.Small);
-                }
-            }
-
-            // --- entities -----------------------------------------------------
-            // Drawn in Y order so a character standing "behind" another overlaps correctly.
-            var drawables = new List<Drawable>(64);
+        /// <summary>Collects players and NPCs with their interpolated world position.</summary>
+        private static List<EntityDrawable> CollectEntities(ClientWorld world, double interpolation)
+        {
+            var list = new List<EntityDrawable>(48);
 
             for (int i = 0; i < world.Npcs.Length; i++)
             {
                 ClientNpc npc = world.Npcs[i];
                 if (npc == null || npc.Plane != world.MyPlane) continue;
-                drawables.Add(new Drawable { Npc = npc, SortY = npc.Y * 1000 + npc.X });
+
+                list.Add(new EntityDrawable
+                {
+                    Npc = npc,
+                    WorldX = npc.LastX + (npc.X - npc.LastX) * interpolation,
+                    WorldY = npc.LastY + (npc.Y - npc.LastY) * interpolation
+                });
             }
 
             for (int i = 0; i < world.Players.Length; i++)
             {
                 ClientPlayer player = world.Players[i];
                 if (player == null || player.Plane != world.MyPlane) continue;
-                drawables.Add(new Drawable { Player = player, SortY = player.Y * 1000 + player.X });
-            }
 
-            drawables.Sort((a, b) => a.SortY.CompareTo(b.SortY));
-
-            foreach (Drawable drawable in drawables)
-            {
-                if (drawable.Player != null)
+                list.Add(new EntityDrawable
                 {
-                    DrawPlayer(target, world, drawable.Player, originTileX, originTileY,
-                        originPixelX, originPixelY, viewX, viewY, viewWidth, viewHeight, interpolation);
-                }
-                else
-                {
-                    DrawNpc(target, world, drawable.Npc, originTileX, originTileY,
-                        originPixelX, originPixelY, viewX, viewY, viewWidth, viewHeight, interpolation);
-                }
+                    Player = player,
+                    WorldX = player.LastX + (player.X - player.LastX) * interpolation,
+                    WorldY = player.LastY + (player.Y - player.LastY) * interpolation
+                });
             }
+
+            return list;
         }
 
-        private sealed class Drawable
+        private void DrawTile(Framebuffer target, ClientWorld world, IsoProjection projection,
+            int vx, int vy, List<EntityDrawable> entities)
         {
-            public ClientPlayer Player;
-            public ClientNpc Npc;
-            public int SortY;
-        }
+            // The tile's own world coordinate, which is where its four corners meet.
+            double wx0, wy0;
+            IsoProjection.Unrotate(vx + projection.CameraX, vy + projection.CameraY,
+                projection.Rotation, out wx0, out wy0);
 
-        private static bool Visible(int px, int py, int viewX, int viewY, int viewWidth, int viewHeight, int margin)
-        {
-            return px >= viewX - margin && px <= viewX + viewWidth + margin &&
-                   py >= viewY - margin && py <= viewY + viewHeight + margin;
-        }
+            int tileX = (int)Math.Floor(wx0 + 0.5);
+            int tileY = (int)Math.Floor(wy0 + 0.5);
 
-        private static int WorldToScreenX(int x, int y, int originTileX, int originTileY, int originPixelX, int originPixelY)
-        {
-            return originPixelX + (x - originTileX) * TileSize;
-        }
+            int type = Terrain.TypeAt(tileX, tileY);
 
-        private static int WorldToScreenY(int x, int y, int originTileX, int originTileY, int originPixelX, int originPixelY)
-        {
-            return originPixelY + (y - originTileY) * TileSize;
-        }
+            // Four corner heights, shared with the neighbouring tiles by construction.
+            int h00 = Terrain.CornerHeight(tileX, tileY);
+            int h10 = Terrain.CornerHeight(tileX + 1, tileY);
+            int h01 = Terrain.CornerHeight(tileX, tileY + 1);
+            int h11 = Terrain.CornerHeight(tileX + 1, tileY + 1);
 
-        private static void DrawDiamond(Framebuffer target, int cx, int cy, int radius, int argb)
-        {
-            for (int dy = -radius; dy <= radius; dy++)
+            // Water is a flat plane: it does not follow the sea bed.
+            if (type == Terrain.Water)
             {
-                int span = radius - Math.Abs(dy);
-                target.FillRect(cx - span, cy + dy, span * 2 + 1, 1, argb);
+                h00 = h10 = h01 = h11 = 0;
+            }
+
+            // Screen positions of the four corners. Corner (x, y) is the back one.
+            // The loop walks offsets from the camera, but the projection wants absolute
+            // view-space coordinates, so the camera is added back here.
+            double avx = vx + projection.CameraX;
+            double avy = vy + projection.CameraY;
+
+            int x00 = projection.ScreenX(avx, avy);
+            int y00 = projection.ScreenY(avx, avy, h00);
+
+            int x10 = projection.ScreenX(avx + 1, avy);
+            int y10 = projection.ScreenY(avx + 1, avy, h10);
+
+            int x01 = projection.ScreenX(avx, avy + 1);
+            int y01 = projection.ScreenY(avx, avy + 1, h01);
+
+            int x11 = projection.ScreenX(avx + 1, avy + 1);
+            int y11 = projection.ScreenY(avx + 1, avy + 1, h11);
+
+            // Cull tiles entirely outside the viewport before any per-pixel work.
+            int minX = Math.Min(Math.Min(x00, x10), Math.Min(x01, x11));
+            int maxX = Math.Max(Math.Max(x00, x10), Math.Max(x01, x11));
+            int minY = Math.Min(Math.Min(y00, y10), Math.Min(y01, y11));
+            int maxY = Math.Max(Math.Max(y00, y10), Math.Max(y01, y11));
+
+            // The cull has to compare against the clipped viewport, not the whole buffer:
+            // the world view starts at (0,0) but the buffer is wider than it.
+            if (maxX < 0 || minX > target.Width) return;
+            if (maxY < 0 || minY > target.Height) return;
+
+            int baseColour = Terrain.ColourFor(type, tileX, tileY, h00, h10, h01, h11);
+
+            // Two triangles, each flat-shaded from its own slope. The split runs along the
+            // diagonal that keeps the facet edges pointing the way the light does.
+            int colourA = Terrain.Shade(baseColour, SlopeLight(h00, h10, h11));
+            int colourB = Terrain.Shade(baseColour, SlopeLight(h00, h11, h01));
+
+            target.FillTriangle(x00, y00, x10, y10, x11, y11, colourA);
+            target.FillTriangle(x00, y00, x11, y11, x01, y01, colourB);
+
+            // A thin darker line along the two far edges separates tiles without drawing a
+            // visible grid. Water gets none: the sea reads better as one plane.
+            if (type != Terrain.Water)
+            {
+                int edge = Terrain.Shade(baseColour, -0.18);
+                DrawLine(target, x00, y00, x10, y10, edge);
+                DrawLine(target, x00, y00, x01, y01, edge);
+            }
+
+            // --- ground items --------------------------------------------------
+            int centreX = (x00 + x11) / 2;
+            int centreY = (y00 + y11) / 2;
+
+            DrawGroundItems(target, world, tileX, tileY, centreX, centreY);
+
+            // --- props ---------------------------------------------------------
+            if (Terrain.HasTree(tileX, tileY))
+            {
+                DrawTree(target, centreX, centreY, tileX, tileY);
+            }
+            else if (Terrain.HasBoulder(tileX, tileY))
+            {
+                DrawBoulder(target, centreX, centreY, tileX, tileY);
+            }
+
+            // --- entities standing on this tile --------------------------------
+            for (int i = 0; i < entities.Count; i++)
+            {
+                EntityDrawable entity = entities[i];
+
+                if ((int)Math.Round(entity.WorldX) != tileX) continue;
+                if ((int)Math.Round(entity.WorldY) != tileY) continue;
+
+                int ex, ey;
+                projection.Project(entity.WorldX, entity.WorldY, Terrain.HeightAt(tileX, tileY), out ex, out ey);
+
+                if (entity.Player != null) DrawPlayer(target, entity.Player, ex, ey);
+                else DrawNpc(target, entity.Npc, ex, ey);
             }
         }
 
-        private void DrawPlayer(Framebuffer target, ClientWorld world, ClientPlayer player,
-            int originTileX, int originTileY, int originPixelX, int originPixelY,
-            int viewX, int viewY, int viewWidth, int viewHeight, double interpolation)
+        /// <summary>
+        /// Lighting term for one triangle, from the elevation of its three corners.
+        /// </summary>
+        private static double SlopeLight(int h0, int h1, int h2)
         {
-            // Interpolate between the previous tile and the current one so movement is
-            // smooth rather than a jump every tick.
-            double px = player.LastX + (player.X - player.LastX) * interpolation;
-            double py = player.LastY + (player.Y - player.LastY) * interpolation;
+            // Gradient across the triangle in tile space. The two edges share corner 0.
+            int dh1 = h1 - h0;
+            int dh2 = h2 - h0;
 
-            int screenX = originPixelX + (int)((px - originTileX) * TileSize);
-            int screenY = originPixelY + (int)((py - originTileY) * TileSize);
+            double light = -(dh1 * 0.055) - (dh2 * 0.075);
 
-            if (!Visible(screenX, screenY, viewX, viewY, viewWidth, viewHeight, 60)) return;
+            if (light > 0.20) light = 0.20;
+            if (light < -0.34) light = -0.34;
 
-            int cx = screenX + TileSize / 2;
-            int baseY = screenY + TileSize - 2;
+            return light;
+        }
 
-            DrawHumanoid(target, cx, baseY, player.Colours, player.EquipmentIds, player.Skulled, player.IsLocal);
+        /// <summary>Draws a one-pixel line, used for tile edges and wall feet.</summary>
+        private static void DrawLine(Framebuffer target, int x0, int y0, int x1, int y1, int argb)
+        {
+            int dx = Math.Abs(x1 - x0);
+            int dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
 
-            // Name and combat level.
+            while (true)
+            {
+                target.FillSpan(x0, x0 + 1, y0, argb);
+
+                if (x0 == x1 && y0 == y1) break;
+
+                int e2 = err * 2;
+                if (e2 > -dy) { err -= dy; x0 += sx; }
+                if (e2 < dx) { err += dx; y0 += sy; }
+            }
+        }
+
+        private void DrawGroundItems(Framebuffer target, ClientWorld world,
+            int tileX, int tileY, int cx, int cy)
+        {
+            for (int i = 0; i < world.GroundItems.Count; i++)
+            {
+                ClientGroundItem item = world.GroundItems[i];
+                if (item.X != tileX || item.Y != tileY || item.Plane != world.MyPlane) continue;
+
+                target.FillDiamond(cx, cy + 2, 6, 3, Framebuffer.Argb(100, 0, 0, 0));
+                target.FillDiamond(cx, cy - 3, 5, 4, Framebuffer.Rgb(234, 198, 98));
+
+                if (item.Amount > 1)
+                {
+                    _text.Draw(target, item.Amount.ToString(), cx + 7, cy - 16, unchecked((int)0xFFFFFF00),
+                        FontRenderer.Size.Small);
+                }
+            }
+        }
+
+        /// <summary>
+        /// A tree with a layered canopy, drawn so it reads as a volume rather than a stamp.
+        /// </summary>
+        private void DrawTree(Framebuffer target, int cx, int cy, int tileX, int tileY)
+        {
+            int variation = (tileX * 7 + tileY * 13) & 3;
+            int trunkHeight = 18 + variation * 4;
+            int canopyWidth = 17 + variation * 2;
+
+            target.FillDiamond(cx, cy + 1, 11, 5, Framebuffer.Argb(95, 0, 0, 0));
+
+            // Trunk with a lit left edge.
+            int trunkTop = cy - trunkHeight;
+            target.FillRect(cx - 3, trunkTop, 6, trunkHeight, Framebuffer.Rgb(76, 54, 32));
+            target.FillRect(cx - 3, trunkTop, 2, trunkHeight, Framebuffer.Rgb(98, 72, 44));
+
+            // Canopy: three overlapping masses, lightest at the top left.
+            target.FillDiamond(cx, trunkTop - 2, canopyWidth, canopyWidth / 2 + 2, Framebuffer.Rgb(40, 72, 36));
+            target.FillDiamond(cx - 2, trunkTop - 9, canopyWidth - 3, canopyWidth / 2, Framebuffer.Rgb(52, 92, 46));
+            target.FillDiamond(cx - 3, trunkTop - 15, canopyWidth - 8, canopyWidth / 3 + 1, Framebuffer.Rgb(66, 112, 56));
+        }
+
+        private void DrawBoulder(Framebuffer target, int cx, int cy, int tileX, int tileY)
+        {
+            int variation = (tileX * 5 + tileY * 11) & 3;
+            int size = 8 + variation * 2;
+
+            target.FillDiamond(cx, cy + 1, size + 3, 4, Framebuffer.Argb(100, 0, 0, 0));
+            target.FillDiamond(cx, cy - size / 2, size, size / 2 + 3, Framebuffer.Rgb(100, 100, 106));
+            target.FillDiamond(cx - 2, cy - size / 2 - 3, size - 3, size / 3, Framebuffer.Rgb(134, 134, 140));
+        }
+
+        private void DrawPlayer(Framebuffer target, ClientPlayer player, int cx, int cy)
+        {
+            DrawHumanoid(target, cx, cy, player.Colours, player.EquipmentIds, player.Skulled, player.IsLocal);
+
             string label = player.Name;
             if (player.CombatLevel > 0) label = player.Name + " (" + player.CombatLevel + ")";
 
-            int labelColour = player.Privilege >= 2 ? unchecked((int)0xFFFF5555)
-                : player.Privilege == 1 ? unchecked((int)0xFF55FF55)
+            int labelColour = player.Privilege >= 2 ? unchecked((int)0xFFFF6B6B)
+                : player.Privilege == 1 ? unchecked((int)0xFF7BE07B)
                 : unchecked((int)0xFFFFFFFF);
 
-            _text.DrawCentred(target, label, cx - 60, baseY - 56, 120, labelColour, FontRenderer.Size.Small);
+            _text.DrawCentred(target, label, cx - 70, cy - 78, 140, labelColour, FontRenderer.Size.Small);
 
-            DrawOverhead(target, player.OverheadText, player.OverheadUntilMs, cx, baseY - 70);
-            DrawHitBar(target, player.Hitpoints, player.MaxHitpoints, player.DamageToShow, cx, baseY - 46);
+            DrawOverhead(target, player.OverheadText, player.OverheadUntilMs, cx, cy - 94);
+            DrawHitBar(target, player.Hitpoints, player.MaxHitpoints, player.DamageToShow, cx, cy - 64);
         }
 
-        private void DrawNpc(Framebuffer target, ClientWorld world, ClientNpc npc,
-            int originTileX, int originTileY, int originPixelX, int originPixelY,
-            int viewX, int viewY, int viewWidth, int viewHeight, double interpolation)
+        private void DrawNpc(Framebuffer target, ClientNpc npc, int cx, int cy)
         {
-            double px = npc.LastX + (npc.X - npc.LastX) * interpolation;
-            double py = npc.LastY + (npc.Y - npc.LastY) * interpolation;
-
-            int screenX = originPixelX + (int)((px - originTileX) * TileSize);
-            int screenY = originPixelY + (int)((py - originTileY) * TileSize);
-
-            if (!Visible(screenX, screenY, viewX, viewY, viewWidth, viewHeight, 60)) return;
-
-            int width = npc.Size * TileSize;
-            int cx = screenX + width / 2;
-            int baseY = screenY + width - 2;
-
-            // NPCs get a simple silhouette tinted by their combat level: harmless things
-            // are calm greens, dangerous things are warm reds.
             int body = npc.CombatLevel <= 0 ? Framebuffer.Rgb(150, 160, 170)
-                : npc.CombatLevel < 20 ? Framebuffer.Rgb(120, 170, 110)
-                : npc.CombatLevel < 60 ? Framebuffer.Rgb(190, 160, 90)
-                : Framebuffer.Rgb(190, 90, 80);
+                : npc.CombatLevel < 20 ? Framebuffer.Rgb(126, 168, 112)
+                : npc.CombatLevel < 60 ? Framebuffer.Rgb(190, 160, 92)
+                : Framebuffer.Rgb(190, 96, 84);
 
-            DrawHumanoid(target, cx, baseY, null, null, false, false, body);
+            DrawHumanoid(target, cx, cy, null, null, false, false, body);
 
             string label = npc.Name;
             if (npc.CombatLevel > 0) label = npc.Name + " (" + npc.CombatLevel + ")";
 
-            _text.DrawCentred(target, label, cx - 60, baseY - 56, 120, unchecked((int)0xFFFFFF66), FontRenderer.Size.Small);
+            _text.DrawCentred(target, label, cx - 70, cy - 78, 140, unchecked((int)0xFFFFFF66), FontRenderer.Size.Small);
 
-            DrawOverhead(target, npc.OverheadText, npc.OverheadUntilMs, cx, baseY - 70);
-            DrawHitBar(target, npc.Hitpoints, npc.MaxHitpoints, npc.DamageToShow, cx, baseY - 46);
+            DrawOverhead(target, npc.OverheadText, npc.OverheadUntilMs, cx, cy - 94);
+            DrawHitBar(target, npc.Hitpoints, npc.MaxHitpoints, npc.DamageToShow, cx, cy - 64);
         }
 
         /// <summary>
-        /// A small stylised humanoid: shadow, legs, torso, arms, head.
+        /// A stylised humanoid: shadow, legs, torso, arms, head, with the weapon visible.
         /// </summary>
         /// <remarks>
-        /// Without model data this is the honest option, and it reads well: silhouette and
-        /// colour carry the information the player needs (who, friend or foe, what they
-        /// are wearing) without pretending to be a 3D render.
+        /// Without model data this is the honest option, and it carries what a player needs —
+        /// who, friend or foe, what they are wearing — without pretending to be a 3D render.
+        /// The shape is deliberately chunky so it reads at a glance in a crowded scene.
         /// </remarks>
         private void DrawHumanoid(Framebuffer target, int cx, int baseY, int[] colours, int[] equipment,
             bool skulled, bool isLocal, int? overrideBody = null)
         {
-            int height = 46;
-            int headRadius = 7;
-            int bodyWidth = 16;
+            const int height = 46;
+            const int bodyWidth = 16;
+            const int headRadius = 6;
 
             int top = baseY - height;
 
-            // Shadow.
-            target.FillCircle(cx, baseY, 9, Framebuffer.Argb(80, 0, 0, 0));
+            target.FillDiamond(cx, baseY, 9, 4, Framebuffer.Argb(105, 0, 0, 0));
 
-            int torso = overrideBody ?? (colours != null ? ShirtColour(colours) : Framebuffer.Rgb(90, 110, 150));
-            int legs = overrideBody ?? (colours != null ? TrouserColour(colours) : Framebuffer.Rgb(70, 70, 90));
-            int skin = colours != null ? SkinColour(colours) : Framebuffer.Rgb(224, 186, 148);
-            int hair = colours != null ? HairColour(colours) : Framebuffer.Rgb(80, 55, 35);
+            int torso = overrideBody ?? (colours != null ? Palette.Colour(colours[1]) : Framebuffer.Rgb(92, 112, 152));
+            int legs = overrideBody ?? (colours != null ? Palette.Colour(colours[2]) : Framebuffer.Rgb(68, 68, 88));
+            int skin = colours != null ? Palette.Colour(colours[4]) : Framebuffer.Rgb(226, 188, 150);
+            int hair = colours != null ? Palette.Colour(colours[0]) : Framebuffer.Rgb(82, 56, 36);
 
-            // Legs.
+            // Legs, with a dark seam between them.
             target.FillRect(cx - 6, top + height - 16, 5, 16, legs);
             target.FillRect(cx + 1, top + height - 16, 5, 16, legs);
+            target.FillRect(cx - 1, top + height - 16, 2, 16, Terrain.Shade(legs, -0.38));
 
-            // Torso.
-            target.FillRect(cx - bodyWidth / 2, top + 16, bodyWidth, 20, torso);
+            // Torso, with a darker right side so it reads as a cylinder.
+            target.FillRect(cx - bodyWidth / 2, top + 15, bodyWidth, 21, torso);
+            target.FillRect(cx + bodyWidth / 2 - 5, top + 15, 5, 21, Terrain.Shade(torso, -0.24));
 
             // Arms.
-            target.FillRect(cx - bodyWidth / 2 - 4, top + 17, 4, 15, skin);
-            target.FillRect(cx + bodyWidth / 2, top + 17, 4, 15, skin);
+            target.FillRect(cx - bodyWidth / 2 - 4, top + 16, 4, 15, skin);
+            target.FillRect(cx + bodyWidth / 2, top + 16, 4, 15, Terrain.Shade(skin, -0.16));
 
             // Head and hair.
-            target.FillCircle(cx, top + 9, headRadius, skin);
-            target.FillRect(cx - headRadius, top + 3, headRadius * 2, 5, hair);
+            target.FillCircle(cx, top + 8, headRadius, skin);
+            target.FillRect(cx - headRadius, top + 2, headRadius * 2, 5, hair);
 
-            // Weapon, if one is worn: a short blade at the right hand.
+            // Weapon at the right hand.
             if (equipment != null && equipment.Length > 3 && equipment[3] > 0)
             {
-                target.FillRect(cx + bodyWidth / 2 + 3, top + 6, 2, 22, Framebuffer.Rgb(200, 205, 215));
-                target.FillRect(cx + bodyWidth / 2 + 2, top + 24, 4, 3, Framebuffer.Rgb(120, 90, 50));
+                target.FillRect(cx + bodyWidth / 2 + 3, top + 3, 2, 24, Framebuffer.Rgb(198, 204, 214));
+                target.FillRect(cx + bodyWidth / 2 + 2, top + 22, 4, 3, Framebuffer.Rgb(118, 88, 48));
             }
 
             if (skulled)
             {
-                target.FillRect(cx - 4, top + 6, 3, 3, Framebuffer.Rgb(220, 40, 40));
-                target.FillRect(cx + 2, top + 6, 3, 3, Framebuffer.Rgb(220, 40, 40));
+                target.FillRect(cx - 4, top + 5, 3, 3, Framebuffer.Rgb(222, 44, 44));
+                target.FillRect(cx + 2, top + 5, 3, 3, Framebuffer.Rgb(222, 44, 44));
             }
 
             if (isLocal)
             {
-                // A subtle marker under the local player so they are never lost in a crowd.
-                target.FillRect(cx - 7, baseY - 1, 14, 2, Framebuffer.Argb(160, 255, 230, 120));
+                target.FillDiamond(cx, baseY + 1, 8, 3, Framebuffer.Argb(150, 255, 232, 120));
             }
-        }
-
-        private static int ShirtColour(int[] colours)
-        {
-            return FromRsColour(colours[1]);
-        }
-
-        private static int TrouserColour(int[] colours)
-        {
-            return FromRsColour(colours[2]);
-        }
-
-        private static int SkinColour(int[] colours)
-        {
-            return FromRsColour(colours[4]);
-        }
-
-        private static int HairColour(int[] colours)
-        {
-            return FromRsColour(colours[0]);
-        }
-
-        /// <summary>
-        /// Maps a RuneScape palette index to an RGB colour.
-        /// </summary>
-        /// <remarks>
-        /// The real palette lives in the cache's media archive. This is a compact
-        /// approximation covering the common values, which is enough for avatars to look
-        /// distinct; the exact palette is a pipeline item.
-        /// </remarks>
-        private static int FromRsColour(int index)
-        {
-            int[] palette =
-            {
-                unchecked((int)0xFF8C5A28), unchecked((int)0xFFB08442), unchecked((int)0xFFD4B063),
-                unchecked((int)0xFFFFFFFF), unchecked((int)0xFF8C6B4A), unchecked((int)0xFF6B4A2A),
-                unchecked((int)0xFF3A2A1A), unchecked((int)0xFF8C3A28), unchecked((int)0xFFB04A28),
-                unchecked((int)0xFFD47A42), unchecked((int)0xFF2A3A6B), unchecked((int)0xFF3A4A8C),
-                unchecked((int)0xFF4A6BB0), unchecked((int)0xFF6B8CD4), unchecked((int)0xFF1A2A1A),
-                unchecked((int)0xFF2A4A2A), unchecked((int)0xFF3A6B3A), unchecked((int)0xFF4A8C4A),
-                unchecked((int)0xFF6BB06B), unchecked((int)0xFF8CD48C), unchecked((int)0xFF1A1A1A),
-                unchecked((int)0xFF2A2A2A), unchecked((int)0xFF3A3A3A), unchecked((int)0xFF6B6B6B),
-                unchecked((int)0xFF8C8C8C), unchecked((int)0xFFB0B0B0), unchecked((int)0xFFD4D4D4),
-                unchecked((int)0xFFFFFFFF), unchecked((int)0xFF4A1A1A), unchecked((int)0xFF6B2A2A),
-                unchecked((int)0xFF8C3A3A), unchecked((int)0xFFB04A4A)
-            };
-
-            int i = index % palette.Length;
-            if (i < 0) i += palette.Length;
-            return palette[i];
         }
 
         private void DrawOverhead(Framebuffer target, string text, int untilMs, int cx, int y)
@@ -434,18 +413,16 @@ namespace DartScape.Client.Rendering
 
             int width = (int)_text.Measure(text, FontRenderer.Size.Small).Width + 8;
 
-            target.BlendRect(cx - width / 2, y - 2, width, 14, Framebuffer.Argb(180, 0, 0, 0));
+            target.BlendRect(cx - width / 2, y - 2, width, 14, Framebuffer.Argb(190, 0, 0, 0));
             _text.DrawCentred(target, text, cx - width / 2, y, width, unchecked((int)0xFFFFFF00), FontRenderer.Size.Small);
         }
 
         private void DrawHitBar(Framebuffer target, int hitpoints, int maxHitpoints, int damage, int cx, int y)
         {
             if (maxHitpoints <= 0) return;
-
-            // Only show a bar for something that is actually in a fight.
             if (hitpoints >= maxHitpoints && damage <= 0) return;
 
-            int width = 30;
+            const int width = 30;
             int filled = (int)((double)Math.Max(0, hitpoints) / maxHitpoints * width);
 
             target.FillRect(cx - width / 2, y, width, 4, Framebuffer.Argb(200, 60, 0, 0));
@@ -454,37 +431,48 @@ namespace DartScape.Client.Rendering
 
             if (damage > 0)
             {
-                _text.DrawCentred(target, "-" + damage, cx - 20, y - 16, 40, unchecked((int)0xFFFF4040), FontRenderer.Size.Bold);
+                _text.DrawCentred(target, "-" + damage, cx - 20, y - 16, 40, unchecked((int)0xFFFF4040),
+                    FontRenderer.Size.Bold);
             }
         }
 
-        /// <summary>Draws the minimap into a square area.</summary>
+        /// <summary>
+        /// Draws the minimap: a square map of the surrounding tiles, rotated with the camera.
+        /// </summary>
+        /// <remarks>
+        /// Square rather than circular, and sized in tiles so it scales with the screen. The
+        /// circle looked tidier but wasted the corners, and on a 640x480 handheld every pixel
+        /// of the map matters.
+        /// </remarks>
         public void DrawMinimap(Framebuffer target, ClientWorld world, int x, int y, int size)
         {
             if (world == null) return;
 
-            target.FillRect(x, y, size, size, Framebuffer.Rgb(20, 26, 20));
+            int pixelsPerTile = Math.Max(1, size / 72);
+            int radius = size / 2 / pixelsPerTile;
 
-            int radius = size / 2 / 2;          // 2 pixels per tile
-            int pixelsPerTile = 2;
+            target.FillRect(x, y, size, size, Framebuffer.Rgb(16, 22, 16));
+
+            int centre = size / 2;
 
             for (int dy = -radius; dy <= radius; dy++)
             {
                 for (int dx = -radius; dx <= radius; dx++)
                 {
-                    if (dx * dx + dy * dy > radius * radius) continue;
+                    // The minimap rotates with the camera, so up on the map is always where
+                    // the player is looking.
+                    double wx, wy;
+                    IsoProjection.Unrotate(world.MyX + dx, world.MyY + dy, world.CameraRotation, out wx, out wy);
 
-                    int worldX = world.MyX + dx;
-                    int worldY = world.MyY + dy;
+                    int type = Terrain.TypeAt((int)Math.Round(wx), (int)Math.Round(wy));
 
-                    Terrain terrain = TerrainAt(worldX, worldY);
-                    int colour = terrain == Terrain.Water ? Framebuffer.Rgb(40, 70, 110)
-                        : terrain == Terrain.Dirt ? Framebuffer.Rgb(110, 90, 60)
-                        : terrain == Terrain.Stone ? Framebuffer.Rgb(100, 100, 105)
-                        : terrain == Terrain.Sand ? Framebuffer.Rgb(170, 155, 105)
+                    int colour = type == Terrain.Water ? Framebuffer.Rgb(38, 66, 104)
+                        : type == Terrain.Sand ? Framebuffer.Rgb(166, 150, 102)
+                        : type == Terrain.Dirt ? Framebuffer.Rgb(120, 102, 74)
+                        : type == Terrain.Rock ? Framebuffer.Rgb(98, 98, 102)
                         : Framebuffer.Rgb(60, 100, 50);
 
-                    target.FillRect(x + size / 2 + dx * pixelsPerTile, y + size / 2 + dy * pixelsPerTile,
+                    target.FillRect(x + centre + dx * pixelsPerTile, y + centre + dy * pixelsPerTile,
                         pixelsPerTile, pixelsPerTile, colour);
                 }
             }
@@ -497,10 +485,10 @@ namespace DartScape.Client.Rendering
 
                 int dx = npc.X - world.MyX;
                 int dy = npc.Y - world.MyY;
-                if (dx * dx + dy * dy > radius * radius) continue;
+                if (Math.Abs(dx) > radius || Math.Abs(dy) > radius) continue;
 
-                target.FillRect(x + size / 2 + dx * pixelsPerTile - 1, y + size / 2 + dy * pixelsPerTile - 1,
-                    3, 3, npc.CombatLevel > 0 ? Framebuffer.Rgb(220, 80, 60) : Framebuffer.Rgb(200, 200, 90));
+                target.FillRect(x + centre + dx * pixelsPerTile - 1, y + centre + dy * pixelsPerTile - 1,
+                    3, 3, npc.CombatLevel > 0 ? Framebuffer.Rgb(222, 84, 62) : Framebuffer.Rgb(200, 200, 92));
             }
 
             // Other players.
@@ -511,18 +499,71 @@ namespace DartScape.Client.Rendering
 
                 int dx = player.X - world.MyX;
                 int dy = player.Y - world.MyY;
-                if (dx * dx + dy * dy > radius * radius) continue;
+                if (Math.Abs(dx) > radius || Math.Abs(dy) > radius) continue;
 
-                target.FillRect(x + size / 2 + dx * pixelsPerTile - 1, y + size / 2 + dy * pixelsPerTile - 1,
-                    3, 3, Framebuffer.Rgb(90, 200, 255));
+                target.FillRect(x + centre + dx * pixelsPerTile - 1, y + centre + dy * pixelsPerTile - 1,
+                    3, 3, Framebuffer.Rgb(92, 200, 255));
             }
 
-            // The local player, always in the centre.
-            target.FillRect(x + size / 2 - 2, y + size / 2 - 2, 4, 4, Framebuffer.Rgb(255, 255, 255));
+            // The local player, always dead centre.
+            target.FillRect(x + centre - 2, y + centre - 2, 4, 4, Framebuffer.Rgb(255, 255, 255));
 
-            // Compass rose.
-            _text.DrawCentred(target, "N", x, y + 2, size, unchecked((int)0xFFFFFFFF), FontRenderer.Size.Small);
-            target.DrawRect(x, y, size, size, Framebuffer.Rgb(180, 170, 130));
+            // Compass: N points where the world's north is on screen after rotation.
+            int nx = 0, ny = -1;
+            for (int r = 0; r < (world.CameraRotation & 3); r++)
+            {
+                int tx = -ny;
+                ny = nx;
+                nx = tx;
+            }
+
+            _text.DrawCentred(target, "N", x + centre + nx * (centre - 8) - 6, y + centre + ny * (centre - 8) - 6,
+                12, unchecked((int)0xFFFFFFFF), FontRenderer.Size.Small);
+
+            target.DrawRect(x, y, size, size, Framebuffer.Rgb(170, 160, 120));
+        }
+
+        /// <summary>A player or NPC paired with the interpolated position it is drawn at.</summary>
+        private sealed class EntityDrawable
+        {
+            public ClientPlayer Player;
+            public ClientNpc Npc;
+            public double WorldX;
+            public double WorldY;
+        }
+    }
+
+    /// <summary>
+    /// Maps the client's body colour indices to RGB.
+    /// </summary>
+    /// <remarks>
+    /// The real palette lives in the cache's media archive. This is a compact approximation
+    /// covering the common values, enough for avatars to look distinct; loading the exact
+    /// palette is a pipeline item.
+    /// </remarks>
+    public static class Palette
+    {
+        private static readonly int[] Colours =
+        {
+            unchecked((int)0xFF8C5A28), unchecked((int)0xFFB08442), unchecked((int)0xFFD4B063),
+            unchecked((int)0xFFFFFFFF), unchecked((int)0xFF8C6B4A), unchecked((int)0xFF6B4A2A),
+            unchecked((int)0xFF3A2A1A), unchecked((int)0xFF8C3A28), unchecked((int)0xFFB04A28),
+            unchecked((int)0xFFD47A42), unchecked((int)0xFF2A3A6B), unchecked((int)0xFF3A4A8C),
+            unchecked((int)0xFF4A6BB0), unchecked((int)0xFF6B8CD4), unchecked((int)0xFF1A2A1A),
+            unchecked((int)0xFF2A4A2A), unchecked((int)0xFF3A6B3A), unchecked((int)0xFF4A8C4A),
+            unchecked((int)0xFF6BB06B), unchecked((int)0xFF8CD48C), unchecked((int)0xFF1A1A1A),
+            unchecked((int)0xFF2A2A2A), unchecked((int)0xFF3A3A3A), unchecked((int)0xFF6B6B6B),
+            unchecked((int)0xFF8C8C8C), unchecked((int)0xFFB0B0B0), unchecked((int)0xFFD4D4D4),
+            unchecked((int)0xFFFFFFFF), unchecked((int)0xFF4A1A1A), unchecked((int)0xFF6B2A2A),
+            unchecked((int)0xFF8C3A3A), unchecked((int)0xFFB04A4A)
+        };
+
+        /// <summary>Colour for a body colour index, wrapped into range.</summary>
+        public static int Colour(int index)
+        {
+            int i = index % Colours.Length;
+            if (i < 0) i += Colours.Length;
+            return Colours[i];
         }
     }
 }

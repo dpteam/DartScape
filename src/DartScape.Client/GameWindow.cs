@@ -186,8 +186,14 @@ namespace DartScape.Client
 
             _worldRenderer.Draw(_framebuffer, _world, 0, 0, viewWidth, viewHeight, interpolation);
 
-            // Minimap in the corner of the world view.
-            _worldRenderer.DrawMinimap(_framebuffer, _world, viewWidth - 152, 8, 144);
+            // Minimap tucked into the top-right corner of the world view, square, below the
+            // status bar and with a small margin so its border never touches the frame edge.
+            const int minimapSize = 144;
+            const int minimapMargin = 6;
+            _worldRenderer.DrawMinimap(_framebuffer, _world,
+                viewWidth - minimapSize - minimapMargin,
+                Hud.TopBarHeight + minimapMargin,
+                minimapSize);
 
             _hud.Draw(_framebuffer, _world, CanvasWidth, CanvasHeight, _chatMode ? "Chat: " + _chatText + "_" : null);
 
@@ -282,10 +288,18 @@ namespace DartScape.Client
                     e.SuppressKeyPress = true;
                     break;
 
-                case Keys.Up: _world.CameraOffsetY += 1; e.Handled = true; break;
-                case Keys.Down: _world.CameraOffsetY -= 1; e.Handled = true; break;
-                case Keys.Left: _world.CameraOffsetX += 1; e.Handled = true; break;
-                case Keys.Right: _world.CameraOffsetX -= 1; e.Handled = true; break;
+                case Keys.Up: _world.CameraOffsetY = Clamp(_world.CameraOffsetY + 1, -14, 14); e.Handled = true; break;
+                case Keys.Down: _world.CameraOffsetY = Clamp(_world.CameraOffsetY - 1, -14, 14); e.Handled = true; break;
+                case Keys.Left: _world.CameraOffsetX = Clamp(_world.CameraOffsetX + 1, -14, 14); e.Handled = true; break;
+                case Keys.Right: _world.CameraOffsetX = Clamp(_world.CameraOffsetX - 1, -14, 14); e.Handled = true; break;
+
+                // Camera rotation, the compass. Q turns one way, E the other, which is the
+                // same muscle memory as the arrow-key camera in the original.
+                case Keys.Q: _world.CameraRotation = (_world.CameraRotation + 3) & 3; e.Handled = true; break;
+                case Keys.E: _world.CameraRotation = (_world.CameraRotation + 1) & 3; e.Handled = true; break;
+
+                // Recentre: drop the camera offset so the player is in the middle again.
+                case Keys.C: _world.CameraOffsetX = 0; _world.CameraOffsetY = 0; e.Handled = true; break;
 
                 case Keys.F1: _world.Tab = 0; e.Handled = true; break;
                 case Keys.F2: _world.Tab = 1; e.Handled = true; break;
@@ -480,25 +494,19 @@ namespace DartScape.Client
 
         private void HandleWorldClick(Point canvas, int viewWidth, int viewHeight)
         {
-            // Convert the screen point back to a world tile, using the same camera maths
-            // the renderer uses.
-            double cameraX = _world.MyX + _world.CameraOffsetX;
-            double cameraY = _world.MyY + _world.CameraOffsetY;
+            // Convert the screen point back to a world tile through the same projection the
+            // renderer uses, including camera rotation and terrain elevation.
+            var projection = new IsoProjection
+            {
+                OriginX = viewWidth / 2,
+                OriginY = viewHeight / 2 + Terrain.RenderHeight(_world.MyX, _world.MyY) * IsoProjection.HeightStep,
+                CameraX = _world.MyX + _world.CameraOffsetX,
+                CameraY = _world.MyY + _world.CameraOffsetY,
+                Rotation = _world.CameraRotation
+            };
 
-            int tilesX = viewWidth / WorldRenderer.TileSize + 3;
-            int tilesY = viewHeight / WorldRenderer.TileSize + 3;
-
-            int originTileX = (int)Math.Floor(cameraX) - tilesX / 2;
-            int originTileY = (int)Math.Floor(cameraY) - tilesY / 2;
-
-            double fracX = cameraX - Math.Floor(cameraX);
-            double fracY = cameraY - Math.Floor(cameraY);
-
-            int originPixelX = -(int)(fracX * WorldRenderer.TileSize);
-            int originPixelY = -(int)(fracY * WorldRenderer.TileSize);
-
-            int tileX = originTileX + (canvas.X - originPixelX) / WorldRenderer.TileSize;
-            int tileY = originTileY + (canvas.Y - originPixelY) / WorldRenderer.TileSize;
+            int tileX, tileY;
+            projection.ScreenToTile(canvas.X, canvas.Y, out tileX, out tileY);
 
             // Prefer an entity at the clicked tile over a plain walk.
             ClientNpc npc = _world.NpcAt(tileX, tileY, _world.MyPlane);
@@ -532,9 +540,31 @@ namespace DartScape.Client
 
             if (!_dragging) return;
 
-            // One tile of camera movement per 32 pixels dragged.
-            _world.CameraOffsetX = _dragCameraX + (canvas.X - _dragStart.X) / WorldRenderer.TileSize;
-            _world.CameraOffsetY = _dragCameraY - (canvas.Y - _dragStart.Y) / WorldRenderer.TileSize;
+            // Drag in screen space and convert back through the projection, so panning
+            // feels correct whatever the camera rotation is.
+            int dxPixels = canvas.X - _dragStart.X;
+            int dyPixels = canvas.Y - _dragStart.Y;
+
+            // Inverse of the isometric projection for a zero-height plane.
+            double a = (double)dxPixels / IsoProjection.HalfWidth;
+            double b = (double)dyPixels / IsoProjection.HalfHeight;
+
+            double vdx = (a + b) * 0.5;
+            double vdy = (b - a) * 0.5;
+
+            int wdx, wdy;
+            IsoProjection.ViewDirectionToWorld(_world.CameraRotation,
+                (int)Math.Round(vdx), (int)Math.Round(vdy), out wdx, out wdy);
+
+            _world.CameraOffsetX = Clamp(_dragCameraX - wdx, -14, 14);
+            _world.CameraOffsetY = Clamp(_dragCameraY - wdy, -14, 14);
+        }
+
+        private static int Clamp(int value, int min, int max)
+        {
+            if (value < min) return min;
+            if (value > max) return max;
+            return value;
         }
 
         private void OnMouseUp(object sender, MouseEventArgs e)

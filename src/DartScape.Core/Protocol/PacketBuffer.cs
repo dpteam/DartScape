@@ -125,9 +125,18 @@ namespace DartScape.Core.Protocol
         }
 
         /// <summary>Writes the low byte without the 0xFF mask вЂ” same as <see cref="WriteByte"/>.</summary>
+        /// <summary>
+        /// Writes <c>value + 128</c>, the 317 "byte A" (add) form.
+        /// </summary>
+        /// <remarks>
+        /// This must be the inverse of <see cref="ReadUnsignedByteA"/>, which subtracts
+        /// 128. Writing the plain value here made every skill level read back 128 higher
+        /// than it should be — a level 1 stat displayed as 129, and a combat level of 0
+        /// because the derived formula then produced nonsense.
+        /// </remarks>
         public PacketBuffer WriteByteA(int value)
         {
-            return WriteByte(value);
+            return WriteByte(value + 128);
         }
 
         /// <summary>Writes <c>value + 128</c>, the "offset byte" form used all over 317.</summary>

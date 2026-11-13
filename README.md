@@ -32,6 +32,23 @@ Drop the folder on a machine, run the exe, and you are in the world.
 | **Launcher** | MSHTML shell (works on XP), account form, server browser, three themes |
 | **Web** | Public status site with live player list, plus a LAN-only admin panel |
 | **Relay** | NAT-hairpin workaround for players behind the same router |
+
+## Roadmap
+
+Beyond the engine work in [docs/PIPELINE.md](docs/PIPELINE.md), the requested
+features and their design are written down in
+**[docs/REQUESTS.md](docs/REQUESTS.md)**:
+
+* **Isometric renderer** — in progress: diamond tiles, elevation, visible walls.
+* **De-branding** — a neutral identity so a fork renames the project from config
+  rather than by find-and-replace (the DPT_Social `[branding]` pattern).
+* **Russian language** — interface, chat and cache strings, with the protocol
+  implications spelled out.
+* **Dark-humour content** — quests, examine text and NPC chatter with a tone brief.
+* **Full account management** — edit characters, delete accounts, bans, mutes,
+  live item and stat editing from the admin panel.
+* **Maintenance mode** — a server state with a whitelist, a reopen countdown and
+  honest messages in the client and launcher.
 ## Quick start
 
 ### Playing

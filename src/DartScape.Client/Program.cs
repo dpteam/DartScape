@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using DartScape.Client.Rendering;
 using DartScape.Core.Diagnostics;
 
 namespace DartScape.Client
@@ -71,6 +72,15 @@ namespace DartScape.Client
             ClientConfig config = ClientConfig.Load(baseDir);
             ApplyArguments(args, config);
 
+            // Offline render mode: draw one frame and exit. Kept in the shipped binary
+            // because it is the only way to inspect the renderer without a display, and
+            // because CI uses it to prove the renderer does not throw.
+            string shotPath = Environment.GetEnvironmentVariable("DARTSCAPE_SHOT");
+            if (!string.IsNullOrEmpty(shotPath))
+            {
+                return RenderScreenshot(config, shotPath);
+            }
+
             Log.Info("Client", "Starting against {0}:{1}.", config.Host, config.Port);
 
             Application.EnableVisualStyles();
@@ -93,6 +103,116 @@ namespace DartScape.Client
 
             Log.Info("Client", "Exited cleanly.");
             return 0;
+        }
+
+        /// <summary>
+        /// Renders one frame of the world to a PNG and exits.
+        /// </summary>
+        /// <remarks>
+        /// Uses a synthetic world rather than a live connection: the point is to exercise the
+        /// renderer, so it needs terrain, props, entities and the interface all present, and
+        /// it must work with no server running.
+        /// </remarks>
+        private static int RenderScreenshot(ClientConfig config, string path)
+        {
+            try
+            {
+                var world = new ClientWorld();
+                var me = new ClientPlayer
+                {
+                    Index = 1,
+                    Name = "DartPower",
+                    IsLocal = true,
+                    X = 3103,
+                    Y = 3136,
+                    LastX = 3103,
+                    LastY = 3136,
+                    CombatLevel = 42,
+                    Hitpoints = 34,
+                    MaxHitpoints = 43,
+                    AppearanceReceived = true
+                };
+
+                me.Colours[0] = 2;
+                me.Colours[1] = 10;
+                me.Colours[2] = 21;
+                me.Colours[4] = 3;
+                me.EquipmentIds[3] = 1;
+
+                world.Players[1] = me;
+                world.MyIndex = 1;
+                world.MyX = 3103;
+                world.MyY = 3136;
+
+                // A few NPCs at plausible offsets so the sorting and occlusion are exercised.
+                int[] offsets = { 3, -2, -4, 5, 2, 6, -3, 4 };
+                string[] names = { "Man", "Guard", "Chicken", "Goblin", "Farmer", "Woman", "Cow", "Guard" };
+                int[] levels = { 0, 21, 1, 2, 0, 0, 0, 21 };
+
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    var npc = new ClientNpc
+                    {
+                        Index = 100 + i,
+                        Name = names[i],
+                        CombatLevel = levels[i],
+                        X = 3222 + offsets[i],
+                        Y = 3218 + offsets[(i + 3) % offsets.Length],
+                        LastX = 3222 + offsets[i],
+                        LastY = 3218 + offsets[(i + 3) % offsets.Length],
+                        Hitpoints = 10,
+                        MaxHitpoints = 10
+                    };
+
+                    world.Npcs[npc.Index] = npc;
+                }
+
+                world.GroundItems.Add(new ClientGroundItem
+                {
+                    ItemId = 995, Amount = 12, X = 3220, Y = 3220, Plane = 0
+                });
+
+                for (int i = 0; i < 21; i++)
+                {
+                    world.BaseLevel[i] = 1;
+                    world.CurrentLevel[i] = 1;
+                }
+                world.BaseLevel[3] = 43;
+                world.BaseLevel[0] = 42;
+                world.CurrentLevel[3] = 34;
+
+                world.AddChatMessage("Welcome to DartScape.", 2);
+                world.AddChatMessage("Type ::help for a list of commands.", 2);
+
+                using (var framebuffer = new Framebuffer(GameWindow.CanvasWidth, GameWindow.CanvasHeight))
+                using (var text = new FontRenderer())
+                {
+                    var renderer = new WorldRenderer(text);
+                    var hud = new Hud(text);
+
+                    int viewWidth = GameWindow.CanvasWidth - Hud.SidebarWidth;
+                    int viewHeight = GameWindow.CanvasHeight - Hud.ChatHeight;
+
+                    framebuffer.FillRect(0, 0, GameWindow.CanvasWidth, GameWindow.CanvasHeight,
+                        Framebuffer.Rgb(20, 26, 20));
+
+                    renderer.Draw(framebuffer, world, 0, 0, viewWidth, viewHeight, 0.5);
+                    renderer.DrawMinimap(framebuffer, world,
+                        viewWidth - 150, Hud.TopBarHeight + 6, 144);
+                    hud.Draw(framebuffer, world, GameWindow.CanvasWidth, GameWindow.CanvasHeight, null);
+
+                    framebuffer.SavePng(path);
+                }
+
+                Console.WriteLine("Rendered " + path);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Log.Exception("Client", ex, "Screenshot render failed");
+                Console.Error.WriteLine("Render failed: " + ex.Message);
+                return 1;
+            }
         }
 
         /// <summary>Applies <c>--flag value</c> pairs over the config file.</summary>
@@ -150,6 +270,12 @@ namespace DartScape.Client
                         // Used by CI: start, draw one frame, exit. Never opens a visible window
                         // for longer than a moment.
                         Environment.SetEnvironmentVariable("DARTSCAPE_SMOKE", "1");
+                        break;
+
+                    case "--screenshot":
+                        // Renders one frame offline and writes it to a PNG. Used to inspect the
+                        // renderer without a display, and by CI to catch a renderer that throws.
+                        if (value != null) { Environment.SetEnvironmentVariable("DARTSCAPE_SHOT", value); i++; }
                         break;
 
                     case "--version":

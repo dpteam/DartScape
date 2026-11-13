@@ -115,6 +115,9 @@ namespace DartScape.Client
         public int CameraOffsetX;
         public int CameraOffsetY;
 
+        /// <summary>Camera rotation in quarter turns, 0..3. RuneScape's compass.</summary>
+        public int CameraRotation;
+
         /// <summary>Region base used to convert local map coordinates to world ones.</summary>
         public int BaseX = 3200;
         public int BaseY = 3200;

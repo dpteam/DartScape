@@ -35,6 +35,14 @@ namespace DartScape.Client.Rendering
         /// <summary>Names of the sidebar tabs, in display order.</summary>
         public static readonly string[] Tabs = { "Skills", "Inventory", "Equipment", "Magic", "Prayer", "Options" };
 
+        /// <summary>Height of the status bar drawn across the top of the world view.</summary>
+        /// <remarks>
+        /// The bar is drawn over the world, not beside it, so anything else placed in the
+        /// top-left of the view has to start below this. The minimap did not, which is why
+        /// the bar appeared to overlap it.
+        /// </remarks>
+        public const int TopBarHeight = 22;
+
         public Hud(FontRenderer text)
         {
             _text = text;
@@ -45,7 +53,7 @@ namespace DartScape.Client.Rendering
         {
             DrawChatBox(target, world, 0, height - ChatHeight, width - SidebarWidth, ChatHeight);
             DrawSidebar(target, world, width - SidebarWidth, 0, SidebarWidth, height);
-            DrawTopBar(target, world, 0, 0, width - SidebarWidth, 22, statusLine);
+            DrawTopBar(target, world, 0, 0, width - SidebarWidth, TopBarHeight, statusLine);
         }
 
         private void DrawTopBar(Framebuffer target, ClientWorld world, int x, int y, int width, int height, string status)
