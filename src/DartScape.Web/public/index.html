@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<!--
+  DartScape — public status site shell.
+  A deliberately 2008-era social-network layout (VK/Facebook chrome): blue top bar,
+  grey-blue page, white panels, compact type. All live data arrives over the JSON
+  API described in docs/WEB-API.md; this file only defines the skeleton and the
+  empty states so the page is readable with JavaScript disabled.
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DartScape — World Status</title>
+  <meta name="description" content="Live world status, online players, hiscores and news for the DartScape world.">
+  <meta name="theme-color" content="#4a76a8" id="themeColor">
+  <meta name="color-scheme" content="light dark">
+
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+
+  <!-- Site design first, server-generated branding second so it can override. -->
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="brand.css">
+
+  <!-- Optional icon font. Every icon here is decorative; text labels always render. -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+  <script>
+    /* Apply the stored theme before first paint to avoid a light-theme flash. */
+    (function () {
+      try {
+        var t = window.localStorage.getItem('dartscape.theme');
+        if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
+        document.documentElement.setAttribute('data-theme', t);
+        var m = document.querySelector('meta[name="theme-color"]');
+        var c = { light: '#4a76a8', dark: '#22374f', ice: '#3a9ec6' };
+        if (m && c[t]) { m.setAttribute('content', c[t]); }
+      } catch (e) { /* private mode / disabled storage — keep the light default. */ }
+    }());
+  </script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ===== Top bar ========================================================= -->
+<header class="topbar" role="banner">
+  <div class="topbar-inner">
+    <a class="brand" href="./" aria-label="DartScape — world status">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span class="brand-name">DartScape</span>
+    </a>
+
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab is-active" href="#status" data-view="status" aria-current="page">Status</a>
+      <a class="tab" href="#hiscore" data-view="hiscore">Hiscores</a>
+      <a class="tab" href="#news" data-view="news">News</a>
+    </nav>
+
+    <div class="topbar-actions">
+      <span class="conn-pill is-unknown" id="conn-pill" aria-live="polite" title="Checking the world…">
+        <span class="pill-dot" aria-hidden="true"></span><span id="conn-text">Connecting…</span>
+      </span>
+
+      <div class="theme-switch" role="group" aria-label="Colour theme">
+        <button type="button" class="theme-btn is-active" data-theme-set="light" title="Light theme" aria-pressed="true">&#9788;<span class="vh">Light theme</span></button>
+        <button type="button" class="theme-btn" data-theme-set="dark" title="Dark theme" aria-pressed="false">&#9790;<span class="vh">Dark theme</span></button>
+        <button type="button" class="theme-btn" data-theme-set="ice" title="Ice theme" aria-pressed="false">&#10052;<span class="vh">Ice theme</span></button>
+      </div>
+
+      <button type="button" class="btn btn--play" id="play-btn">
+        <i class="fa-solid fa-play" aria-hidden="true"></i><span class="btn-play-label">Play</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== Stats strip ==================================================== -->
+<section class="statstrip" aria-label="World at a glance">
+  <div class="statstrip-inner">
+    <div class="stat">
+      <span class="stat-label">Players online</span>
+      <span class="stat-value" id="stat-players">—</span>
+      <span class="stat-note" id="stat-players-note">checking the world…</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Accounts</span>
+      <span class="stat-value" id="stat-accounts">—</span>
+      <span class="stat-note" id="stat-accounts-note">registered</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Uptime</span>
+      <span class="stat-value" id="stat-uptime">—</span>
+      <span class="stat-note" id="stat-uptime-note">since last restart</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Tick rate</span>
+      <span class="stat-value" id="stat-tick">—</span>
+      <span class="stat-note" id="stat-tick-note">game loop speed</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Page =========================================================== -->
+<main class="layout" id="main">
+  <h1 class="vh">DartScape world status</h1>
+
+  <!-- Left navigation column (wide screens only) -->
+  <nav class="sidenav" aria-label="Navigation">
+    <div class="panel">
+      <div class="panel-head"><h2>Navigation</h2></div>
+      <ul class="navlist">
+        <li><a class="navlink is-active" href="#status" data-view="status" aria-current="page">World status</a></li>
+        <li><a class="navlink" href="#hiscore" data-view="hiscore">Hiscores</a></li>
+        <li><a class="navlink" href="#news" data-view="news">News</a></li>
+      </ul>
+      <div class="sidenav-foot">
+        <span class="sidenav-world">DartScape</span>
+        <span class="sidenav-region" id="nav-region">EU</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Shortcuts</h2></div>
+      <div class="panel-body panel-body--tight">
+        <button type="button" class="btn btn--block btn--sm" data-copy>Copy server address</button>
+        <p class="hint">Paste it into your client's world list.</p>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main column -->
+  <div class="column-main">
+
+    <!-- ---------- Status view ---------- -->
+    <section class="view" id="view-status" aria-label="World status">
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Server status</h2>
+          <span class="panel-note" id="server-note">live</span>
+        </div>
+        <div class="panel-body">
+          <div class="kv" id="server-kv">
+            <div class="kv-row"><span class="kv-key">World</span><span class="kv-val">DartScape</span></div>
+            <div class="kv-row"><span class="kv-key">Status</span><span class="kv-val"><span class="dot"></span>Checking…</span></div>
+            <div class="kv-row"><span class="kv-key">Version</span><span class="kv-val">—</span></div>
+            <div class="kv-row"><span class="kv-key">Game port</span><span class="kv-val mono">43594</span></div>
+            <div class="kv-row"><span class="kv-key">Web port</span><span class="kv-val mono">43595</span></div>
+            <div class="kv-row"><span class="kv-key">Relay</span><span class="kv-val mono">43597</span></div>
+            <div class="kv-row"><span class="kv-key">Access</span><span class="kv-val">Free to play</span></div>
+            <div class="kv-row"><span class="kv-key">Last restart</span><span class="kv-val">—</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Online players</h2>
+          <span class="panel-note" id="players-note">—</span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="rank" scope="col">#</th>
+                <th scope="col">Player</th>
+                <th class="num" scope="col">Combat</th>
+                <th class="num" scope="col">Total level</th>
+                <th class="num" scope="col">World</th>
+              </tr>
+            </thead>
+            <tbody id="players-body">
+              <tr><td colspan="5" class="empty">Nobody is online right now.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>World events</h2>
+          <span class="panel-note"><span class="live-dot" aria-hidden="true"></span>live feed</span>
+        </div>
+        <ul class="events" id="event-list">
+          <li class="empty">No world events yet.</li>
+        </ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>News</h2>
+          <a class="panel-link" href="#news" data-view="news">All news &rsaquo;</a>
+        </div>
+        <div class="news-mini" id="news-mini">
+          <p class="empty">No news has been posted yet.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ---------- Hiscores view ---------- -->
+    <section class="view is-hidden" id="view-hiscore" aria-label="Hiscores">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Hiscores</h2>
+          <span class="panel-note" id="hiscore-note">top 25</span>
+        </div>
+        <div class="panel-body panel-body--toolbar">
+          <label class="field">
+            <span class="field-label">Skill</span>
+            <select id="skill-select" class="select">
+              <option value="attack">Attack</option>
+              <option value="strength">Strength</option>
+              <option value="defence">Defence</option>
+              <option value="ranged">Ranged</option>
+              <option value="prayer">Prayer</option>
+              <option value="magic">Magic</option>
+              <option value="runecrafting">Runecrafting</option>
+              <option value="construction">Construction</option>
+              <option value="hitpoints">Hitpoints</option>
+              <option value="agility">Agility</option>
+              <option value="herblore">Herblore</option>
+              <option value="thieving">Thieving</option>
+              <option value="crafting">Crafting</option>
+              <option value="fletching">Fletching</option>
+              <option value="slayer">Slayer</option>
+              <option value="hunter">Hunter</option>
+              <option value="mining">Mining</option>
+              <option value="smithing">Smithing</option>
+              <option value="fishing">Fishing</option>
+              <option value="cooking">Cooking</option>
+              <option value="firemaking">Firemaking</option>
+              <option value="woodcutting" selected>Woodcutting</option>
+              <option value="farming">Farming</option>
+            </select>
+          </label>
+          <button type="button" class="btn" id="hiscore-refresh">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th class="rank" scope="col">Rank</th>
+                <th scope="col">Player</th>
+                <th class="num" scope="col">Level</th>
+                <th class="num" scope="col">Experience</th>
+              </tr>
+            </thead>
+            <tbody id="hiscore-body">
+              <tr><td colspan="4" class="empty">Loading hiscores…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- News view ---------- -->
+    <section class="view is-hidden" id="view-news" aria-label="News">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>News</h2>
+          <span class="panel-note">newest first</span>
+        </div>
+        <div class="news-full" id="news-full">
+          <p class="empty">Loading news…</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Right rail -->
+  <aside class="rail" aria-label="Sidebar">
+
+    <div class="panel" id="connect-panel">
+      <div class="panel-head"><h2>Connect</h2></div>
+      <div class="panel-body">
+        <p class="connect-label">Server address</p>
+        <div class="address-box">
+          <code id="connect-address">rune.dartpower.xyz</code><span class="address-port" id="connect-port">:43594</span>
+        </div>
+        <button type="button" class="btn btn--block" data-copy>Copy address</button>
+        <p class="hint">Add this as a world in your client, then log in with your account.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Top skills</h2></div>
+      <div class="panel-body" id="skills-list">
+        <p class="empty">Skill totals are not available yet.</p>
+      </div>
+    </div>
+
+    <div class="panel panel--about">
+      <div class="panel-head"><h2>About</h2></div>
+      <div class="panel-body">
+        <p class="about-text">A small RuneScape-flavoured world written in C# for .NET 4.0. Old client, old protocol, new adventures.</p>
+        <div class="kv kv--compact">
+          <div class="kv-row"><span class="kv-key">Logins (24h)</span><span class="kv-val" id="about-logins">—</span></div>
+          <div class="kv-row"><span class="kv-key">Revision</span><span class="kv-val mono" id="about-rev">—</span></div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<noscript>
+  <div class="noscript">
+    <div class="noscript-inner">
+      <strong>JavaScript is switched off.</strong>
+      The status page needs JavaScript to read the world's JSON API. You can still
+      call <a href="api/status">api/status</a>, <a href="api/news">api/news</a> or
+      <a href="api/hiscore?skill=woodcutting">api/hiscore</a> directly — or connect
+      to <code>rune.dartpower.xyz:43594</code> with your client.
+    </div>
+  </div>
+</noscript>
+
+<!-- ===== Footer ========================================================= -->
+<footer class="sitefoot">
+  <div class="sitefoot-inner">
+    <p>
+      <strong>DartScape</strong>
+      <span class="foot-version" id="foot-version">v—</span>
+      <span class="foot-sep">·</span>
+      <span id="foot-rev">revision —</span>
+    </p>
+    <p class="foot-legal">DartScape is a fan project and is not affiliated with Jagex Ltd. RuneScape is a trademark of Jagex Ltd.</p>
+    <p class="foot-links">
+      <a href="api/health">api/health</a><span class="foot-sep">·</span><a href="api/status">api/status</a><span class="foot-sep">·</span><a href="api/news">api/news</a>
+    </p>
+  </div>
+</footer>
+
+<!-- Single reusable toast; only one can ever be visible. -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/js/app.js?v=1"></script>
+</body>
+</html>

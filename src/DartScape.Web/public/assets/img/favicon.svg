@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="DartScape">
+  <!-- Gold "D" on a navy rounded square: the same mark as the top bar. -->
+  <rect width="32" height="32" rx="7" fill="#1b2c4a"/>
+  <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="none" stroke="#2f4a72" stroke-width="1"/>
+  <path fill="#e8c25a" fill-rule="evenodd"
+        d="M9.5 7.5 H16.3 C21.6 7.5 25 10.8 25 16 C25 21.2 21.6 24.5 16.3 24.5 H9.5 Z
+           M13.7 11.1 H16.3 C19.2 11.1 20.9 12.9 20.9 16 C20.9 19.1 19.2 20.9 16.3 20.9 H13.7 Z"/>
+</svg>

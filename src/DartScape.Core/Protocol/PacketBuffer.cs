@@ -478,6 +478,25 @@ namespace DartScape.Core.Protocol
             return value;
         }
 
+        /// <summary>
+        /// Reads a string terminated by a newline byte (0x0A) instead of a NUL.
+        /// </summary>
+        /// <remarks>
+        /// Cache definition files store the "examine" text this way: it is a free-form
+        /// block that may contain commas, quotes and other punctuation, so a newline is
+        /// used as the delimiter. Reading it as a NUL-terminated string desynchronises
+        /// the whole definition stream, which shows up as garbage characters glued to
+        /// the front of the next field.
+        /// </remarks>
+        public string ReadNewlineString()
+        {
+            int start = _readPos;
+            while (_readPos < _writePos && _data[_readPos] != 10) _readPos++;
+            string value = TextEncoding.GetString(_data, start, _readPos - start);
+            if (_readPos < _writePos) _readPos++;    // consume the newline
+            return value;
+        }
+
         /// <summary>Reads exactly <paramref name="length"/> bytes into a new array.</summary>
         public byte[] ReadBytes(int length)
         {

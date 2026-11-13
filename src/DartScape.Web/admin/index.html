@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<!--
+  DartScape Admin — index.html
+  Role: shell for the LAN-only admin panel (port 43596). Contains the token
+  login gate, the authenticated layout (top bar, sidebar, five sections), the
+  shared dialog and toast hosts. All behaviour lives in assets/js/app.js; all
+  styling in assets/css/app.css. No frameworks, no build step.
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#4a76a8">
+  <title>DartScape Admin</title>
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+  <link rel="stylesheet" href="assets/css/app.css?v=1">
+</head>
+<body>
+
+<noscript>
+  <div class="noscript" role="alert">
+    <strong>JavaScript is required.</strong> The admin panel is a client-side
+    application. Enable JavaScript in this browser and reload the page.
+  </div>
+</noscript>
+
+<!-- ============================================================
+     LOGIN GATE — shown until a token is verified
+     ============================================================ -->
+<div class="login-gate" id="loginGate">
+  <form class="login-card" id="loginForm" novalidate autocomplete="off">
+    <div class="login-brand">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span>
+        <strong>DartScape</strong>
+        <small>Admin panel</small>
+      </span>
+    </div>
+
+    <p class="login-lede">
+      Sign in with the admin token from <code>config.ini</code>
+      (<code>[admin] token</code>).
+    </p>
+
+    <label class="field-label" for="tokenInput">Admin token</label>
+    <input class="input" type="password" id="tokenInput" name="token"
+           autocomplete="current-password" spellcheck="false" autocapitalize="off"
+           autocorrect="off" required>
+
+    <label class="check">
+      <input type="checkbox" id="rememberToken">
+      <span>Remember on this device</span>
+    </label>
+
+    <button class="btn btn-primary btn-block" type="submit" id="loginSubmit">Sign in</button>
+
+    <p class="form-error" id="loginError" role="alert" aria-live="polite"></p>
+    <p class="login-foot">LAN only — never expose port 43596 to the internet.</p>
+  </form>
+</div>
+
+<!-- ============================================================
+     APPLICATION SHELL — revealed after authentication
+     ============================================================ -->
+<div class="app" id="app" hidden>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span class="brand-title">DartScape</span>
+      <span class="brand-chip">Admin</span>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <span class="pill conn is-off" id="connPill" title="Connection status">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="connText">Offline</span>
+      </span>
+
+      <div class="theme-switch" role="group" aria-label="Theme">
+        <button type="button" class="theme-btn" data-theme-set="light"
+                aria-pressed="false" title="Light theme" aria-label="Light theme">
+          <span class="swatch swatch-light" aria-hidden="true"></span>
+          <span class="theme-name">Light</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme-set="dark"
+                aria-pressed="false" title="Dark theme" aria-label="Dark theme">
+          <span class="swatch swatch-dark" aria-hidden="true"></span>
+          <span class="theme-name">Dark</span>
+        </button>
+        <button type="button" class="theme-btn" data-theme-set="ice"
+                aria-pressed="false" title="Ice theme" aria-label="Ice theme">
+          <span class="swatch swatch-ice" aria-hidden="true"></span>
+          <span class="theme-name">Ice</span>
+        </button>
+      </div>
+
+      <button type="button" class="btn btn-sm" id="signOutBtn">Sign out</button>
+    </div>
+  </header>
+
+  <div class="shell">
+
+    <nav class="sidebar" id="sidebar" role="tablist" aria-label="Admin sections">
+      <button type="button" class="nav-item is-active" id="nav-overview" role="tab"
+              aria-selected="true" aria-controls="tab-overview" data-tab="overview">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1"></rect>
+        </svg>
+        <span class="nav-label">Overview</span>
+      </button>
+
+      <button type="button" class="nav-item" id="nav-players" role="tab"
+              aria-selected="false" aria-controls="tab-players" data-tab="players">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="6" cy="5.4" r="2.2"></circle>
+          <path d="M2.2 13.2c0-2.1 1.7-3.4 3.8-3.4s3.8 1.3 3.8 3.4"></path>
+          <circle cx="11.5" cy="6.2" r="1.6"></circle>
+          <path d="M10.7 9.9c1.9 0 3.2 1.1 3.2 2.9"></path>
+        </svg>
+        <span class="nav-label">Players</span>
+        <span class="nav-badge" id="navPlayerCount" hidden>0</span>
+      </button>
+
+      <button type="button" class="nav-item" id="nav-console" role="tab"
+              aria-selected="false" aria-controls="tab-console" data-tab="console">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="1.8" y="2.5" width="12.4" height="11" rx="1.4"></rect>
+          <path d="M4.3 6l2.1 2-2.1 2M8.5 10.2h3.2"></path>
+        </svg>
+        <span class="nav-label">Console</span>
+      </button>
+
+      <button type="button" class="nav-item" id="nav-logs" role="tab"
+              aria-selected="false" aria-controls="tab-logs" data-tab="logs">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+          <path d="M3 3.4h10M3 8h10M3 12.6h7"></path>
+        </svg>
+        <span class="nav-label">Logs</span>
+      </button>
+
+      <button type="button" class="nav-item" id="nav-config" role="tab"
+              aria-selected="false" aria-controls="tab-config" data-tab="config">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h12"></path>
+          <circle cx="6" cy="4" r="1.7"></circle>
+          <circle cx="10.5" cy="8" r="1.7"></circle>
+          <circle cx="4.5" cy="12" r="1.7"></circle>
+        </svg>
+        <span class="nav-label">Config</span>
+      </button>
+    </nav>
+
+    <main class="main" id="main">
+
+      <!-- ========================================================
+           OVERVIEW
+           ======================================================== -->
+      <section class="tab is-active" id="tab-overview" role="tabpanel"
+               aria-labelledby="nav-overview">
+        <div class="section-head">
+          <h2>Overview</h2>
+          <div class="section-actions">
+            <span class="muted small" id="overviewUpdated">Waiting for data</span>
+            <button type="button" class="btn btn-sm" id="overviewRefresh">Refresh</button>
+          </div>
+        </div>
+
+        <div class="stats" id="overviewStats">
+          <div class="stat">
+            <span class="stat-label">Uptime</span>
+            <span class="stat-value" id="ovUptime">—</span>
+            <span class="stat-sub" id="ovStarted">since —</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Players</span>
+            <span class="stat-value" id="ovPlayers">—</span>
+            <span class="stat-sub" id="ovAccountsStat">— accounts</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Tick rate</span>
+            <span class="stat-value" id="ovTickRate">—</span>
+            <span class="stat-sub">ticks / second</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Avg tick</span>
+            <span class="stat-value" id="ovTickMs">—</span>
+            <span class="stat-sub">milliseconds</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Memory</span>
+            <span class="stat-value" id="ovMemory">—</span>
+            <span class="stat-sub">heap used</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Threads</span>
+            <span class="stat-value" id="ovThreads">—</span>
+            <span class="stat-sub">live</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Restarts</span>
+            <span class="stat-value" id="ovRestarts">—</span>
+            <span class="stat-sub">this process</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Process</h3>
+            <span class="pill" id="ovServerState">Unknown</span>
+          </div>
+          <div class="panel-body">
+            <dl class="kv">
+              <div class="kv-row"><dt>PID</dt><dd id="ovPid">—</dd></div>
+              <div class="kv-row"><dt>Started</dt><dd id="ovStartedAt">—</dd></div>
+              <div class="kv-row"><dt>Log file</dt><dd class="mono" id="ovLogFile">—</dd></div>
+              <div class="kv-row"><dt>GC collections</dt><dd id="ovGc">—</dd></div>
+              <div class="kv-row"><dt>NPCs</dt><dd id="ovNpcs">—</dd></div>
+              <div class="kv-row"><dt>Ground items</dt><dd id="ovGround">—</dd></div>
+              <div class="kv-row"><dt>Accounts</dt><dd id="ovAccounts">—</dd></div>
+            </dl>
+
+            <h4 class="subhead">Last error</h4>
+            <pre class="code-block" id="ovLastError">None recorded.</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           PLAYERS
+           ======================================================== -->
+      <section class="tab" id="tab-players" role="tabpanel"
+               aria-labelledby="nav-players" hidden>
+        <div class="section-head">
+          <h2>Players <span class="count" id="playerCount">0</span></h2>
+          <div class="section-actions">
+            <input type="search" class="input input-search" id="playerFilter"
+                   placeholder="Filter by name or IP" aria-label="Filter players">
+            <button type="button" class="btn btn-sm" id="playersRefresh">Refresh</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap table-wrap--scroll">
+            <table class="table players-table">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Combat</th>
+                  <th scope="col">Total level</th>
+                  <th scope="col">Position</th>
+                  <th scope="col">Session</th>
+                  <th scope="col">Address</th>
+                  <th scope="col">Idle</th>
+                  <th scope="col" class="col-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="playersBody"></tbody>
+            </table>
+          </div>
+          <p class="empty" id="playersEmpty">No players online.</p>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           CONSOLE
+           ======================================================== -->
+      <section class="tab" id="tab-console" role="tabpanel"
+               aria-labelledby="nav-console" hidden>
+        <div class="section-head">
+          <h2>Console</h2>
+          <div class="section-actions">
+            <span class="muted small">Up / Down recalls history</span>
+            <button type="button" class="btn btn-sm" id="consoleClear">Clear</button>
+          </div>
+        </div>
+
+        <div class="console" id="consoleOut" role="log" aria-live="polite"
+             aria-label="Console output" tabindex="0"></div>
+
+        <form class="console-form" id="consoleForm" autocomplete="off">
+          <span class="prompt" aria-hidden="true">&gt;</span>
+          <input type="text" class="input input-mono" id="consoleInput" name="command"
+                 placeholder="::item 995 1000 Dart" aria-label="Server command"
+                 spellcheck="false" autocomplete="off" autocapitalize="off">
+          <button type="submit" class="btn btn-primary" id="consoleRun">Run</button>
+        </form>
+
+        <div class="panel broadcast">
+          <label class="field-label" for="broadcastInput">Broadcast to all</label>
+          <form class="row" id="broadcastForm">
+            <input type="text" class="input" id="broadcastInput" name="broadcast"
+                   placeholder="Server restarting in 5 minutes" maxlength="240"
+                   autocomplete="off" aria-label="Broadcast message">
+            <button type="submit" class="btn" id="broadcastSend">Send</button>
+          </form>
+          <p class="hint">Every online player sees this as a system message.</p>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           LOGS
+           ======================================================== -->
+      <section class="tab" id="tab-logs" role="tabpanel"
+               aria-labelledby="nav-logs" hidden>
+        <div class="section-head">
+          <h2>Logs</h2>
+          <div class="section-actions">
+            <div class="segmented" id="logLevels" role="group" aria-label="Filter by level">
+              <button type="button" data-level="all" class="is-active"
+                      aria-pressed="true">All</button>
+              <button type="button" data-level="debug" aria-pressed="false">Debug</button>
+              <button type="button" data-level="info" aria-pressed="false">Info</button>
+              <button type="button" data-level="warn" aria-pressed="false">Warn</button>
+              <button type="button" data-level="error" aria-pressed="false">Error</button>
+            </div>
+            <label class="check">
+              <input type="checkbox" id="logAutoScroll" checked>
+              <span>Auto-scroll</span>
+            </label>
+            <button type="button" class="btn btn-sm" id="logClear">Clear</button>
+          </div>
+        </div>
+
+        <div class="logbox" id="logOut" role="log" aria-label="Server log" tabindex="0"></div>
+
+        <div class="logfoot">
+          <span id="logCount">0 lines</span>
+          <span id="logStatus">Connecting…</span>
+        </div>
+      </section>
+
+      <!-- ========================================================
+           CONFIG
+           ======================================================== -->
+      <section class="tab" id="tab-config" role="tabpanel"
+               aria-labelledby="nav-config" hidden>
+        <div class="section-head">
+          <h2>Config</h2>
+          <div class="section-actions">
+            <span class="muted small" id="configMeta">Read-only · secrets redacted</span>
+            <input type="search" class="input input-search" id="configSearch"
+                   placeholder="Search keys and values" aria-label="Search configuration">
+            <button type="button" class="btn btn-sm" id="configRefresh">Reload</button>
+          </div>
+        </div>
+
+        <div id="configSections"></div>
+        <p class="empty" id="configEmpty" hidden>No configuration entries.</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ============================================================
+     SHARED DIALOG
+     ============================================================ -->
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"
+       aria-describedby="modalBody">
+    <div class="modal-head">
+      <h3 id="modalTitle">Confirm</h3>
+      <button type="button" class="icon-btn" id="modalClose" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn" id="modalCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="modalConfirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     TOAST HOST
+     ============================================================ -->
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="assets/js/app.js?v=1"></script>
+</body>
+</html>
