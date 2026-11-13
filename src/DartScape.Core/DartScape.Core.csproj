@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DartScape.Core</RootNamespace>
+    <AssemblyName>DartScape.Core</AssemblyName>
+    <Description>DartScape shared core: logging, configuration, protocol, cache and networking primitives.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+
+</Project>

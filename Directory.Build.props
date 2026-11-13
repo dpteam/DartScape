@@ -1,0 +1,58 @@
+<Project>
+
+  <!--
+    DartScape — shared build configuration.
+
+    Hard constraints (do not relax these):
+      * .NET Framework 4.0 only  -> last runtime that officially supports Windows XP SP3
+      * no third-party libraries  -> only what ships in the .NET Framework itself
+      * x86 builds                -> XP-era machines are 32-bit, and it keeps the
+                                     working set small on old hardware
+    The C# language version is deliberately pinned to 7.3: Roslyn emits IL that the
+    .NET 4.0 CLR understands, so we get modern syntax on an ancient runtime.
+    Anything that needs a NuGet package (ValueTuple, Span, async streams, ...)
+    is off limits and the compiler will tell us loudly if we try.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net40</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>4</WarningLevel>
+    <NoWarn>$(NoWarn);1591;0618</NoWarn>
+
+    <!-- No implicit package references: everything must come from the framework. -->
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>false</GenerateBindingRedirectsOutputType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- Deterministic output keeps diffs sane and CI honest. -->
+    <Deterministic>true</Deterministic>
+    <DebugType>pdbonly</DebugType>
+    <ErrorReport>none</ErrorReport>
+
+    <!-- Company / product metadata for the Windows file properties dialog. -->
+    <Product>DartScape</Product>
+    <Company>DartPower</Company>
+    <Copyright>Copyright © DartPower 2026</Copyright>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+  </PropertyGroup>
+
+  <!--
+    Output layout: normal bin/obj per project (gitignored). `tools\build.ps1`
+    collects the runnable output into artifacts\dist so packaging has one
+    obvious directory to zip.
+  -->
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+</Project>
