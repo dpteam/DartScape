@@ -31,7 +31,7 @@
 
   var THEME_KEY = 'dartscape.theme';
   var THEMES = ['light', 'dark', 'ice'];
-  var THEME_COLORS = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
+  var THEME_COLORS = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

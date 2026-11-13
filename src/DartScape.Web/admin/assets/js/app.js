@@ -415,9 +415,11 @@
   function onAuthError() {
     if (!state.token) { return; }
     state.token = null;
+    state.busy = {};
     storageRemove(TOKEN_KEY);
     stopPolling();
     setConn('off');
+    dom.rememberToken.checked = false;
     showLogin('Your token was rejected. Sign in again.');
     toast('error', 'Session expired — sign in again.');
   }
@@ -442,9 +444,16 @@
     dom.playersBody.innerHTML = '';
     dom.configSections.innerHTML = '';
     dom.playersEmpty.hidden = false;
+    dom.playerCount.textContent = '0';
+    dom.playerFilter.value = '';
+    dom.configSearch.value = '';
+    state.playerFilter = '';
     dom.logCount.textContent = '0 lines';
     dom.logStatus.textContent = 'Connecting…';
     dom.configMeta.textContent = 'Read-only · secrets redacted';
+    dom.overviewUpdated.textContent = 'Waiting for data';
+    dom.navPlayerCount.hidden = true;
+    resetOverview();
 
     dom.app.hidden = true;
     dom.loginGate.hidden = false;
@@ -649,6 +658,23 @@
     } else {
       dom.navPlayerCount.hidden = true;
     }
+  }
+
+  /* Blank the overview so a signed-out panel never shows stale numbers. */
+  function resetOverview() {
+    var ids = ['ovUptime', 'ovPlayers', 'ovTickRate', 'ovTickMs', 'ovMemory',
+      'ovThreads', 'ovRestarts', 'ovPid', 'ovStartedAt', 'ovGc', 'ovNpcs',
+      'ovGround', 'ovAccounts'];
+    for (var i = 0; i < ids.length; i++) {
+      setText(dom[ids[i]], '—');
+    }
+    setText(dom.ovStarted, 'since —');
+    setText(dom.ovAccountsStat, '— accounts');
+    setText(dom.ovLogFile, '—');
+    dom.ovLastError.textContent = 'None recorded.';
+    removeClass(dom.ovLastError, 'has-error');
+    dom.ovServerState.textContent = 'Unknown';
+    dom.ovServerState.className = 'pill';
   }
 
   /* 8. PLAYERS ------------------------------------------------------------ */
@@ -974,6 +1000,11 @@
     } else if (e.keyCode === 40) {
       e.preventDefault();
       historyNext();
+    } else if (e.keyCode === 13) {
+      /* Handle Enter explicitly so it works even when implicit form
+         submission is unavailable (IME, some mobile keyboards). */
+      e.preventDefault();
+      runCommand(dom.consoleInput.value);
     }
   }
 
@@ -1007,6 +1038,13 @@
   function onBroadcastSubmit(e) {
     e.preventDefault();
     submitBroadcast(dom.broadcastInput.value);
+  }
+
+  function onBroadcastKey(e) {
+    if (e.keyCode === 13) {
+      e.preventDefault();
+      submitBroadcast(dom.broadcastInput.value);
+    }
   }
 
   /* 10. LOG TAIL ---------------------------------------------------------- */
@@ -1526,6 +1564,12 @@
 
   function bindEvents() {
     dom.loginForm.addEventListener('submit', onLoginSubmit);
+    dom.tokenInput.addEventListener('keydown', function (e) {
+      if (e.keyCode !== 13) { return; }
+      e.preventDefault();
+      if (dom.loginSubmit.disabled) { return; }
+      onLoginSubmit({ preventDefault: function () { /* no-op */ } });
+    });
 
     dom.signOutBtn.addEventListener('click', signOut);
 
@@ -1566,6 +1610,7 @@
     });
 
     dom.broadcastForm.addEventListener('submit', onBroadcastSubmit);
+    dom.broadcastInput.addEventListener('keydown', onBroadcastKey);
 
     dom.logLevels.addEventListener('click', onLogLevelClick);
     dom.logAutoScroll.addEventListener('change', onAutoScrollChange);

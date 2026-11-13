@@ -811,6 +811,7 @@ html[data-theme="ice"] {
   .players-table td.cell-name {
     margin-bottom: 3px;
     font-size: 13px;
+    overflow-wrap: anywhere;
   }
 
   .players-table td.cell-num,

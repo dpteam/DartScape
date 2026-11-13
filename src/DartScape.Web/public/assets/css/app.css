@@ -147,7 +147,7 @@ strong, b { font-weight: 700; }
   --link: #2b587a;
   --link-hover: #1d4361;
 
-  --accent: #4a76a8;
+  --accent: #45688e;
   --accent-strong: #2f5b86;
   --accent-soft: #eaf1f9;
 
@@ -160,6 +160,7 @@ strong, b { font-weight: 700; }
   --topbar-line: rgba(255, 255, 255, 0.16);
   --topbar-pill-bg: rgba(255, 255, 255, 0.14);
   --topbar-well: rgba(0, 0, 0, 0.10);
+  --topbar-shadow: rgba(0, 0, 0, 0.28);
 
   --ok: #3f8a3f;
   --ok-soft: #e8f4e6;
@@ -209,7 +210,7 @@ html[data-theme="light"] {
   --link: #2b587a;
   --link-hover: #1d4361;
 
-  --accent: #4a76a8;
+  --accent: #45688e;
   --accent-strong: #2f5b86;
   --accent-soft: #eaf1f9;
 
@@ -222,6 +223,7 @@ html[data-theme="light"] {
   --topbar-line: rgba(255, 255, 255, 0.16);
   --topbar-pill-bg: rgba(255, 255, 255, 0.14);
   --topbar-well: rgba(0, 0, 0, 0.10);
+  --topbar-shadow: rgba(0, 0, 0, 0.28);
 
   --ok: #3f8a3f;
   --ok-soft: #e8f4e6;
@@ -284,6 +286,7 @@ html[data-theme="dark"] {
   --topbar-line: rgba(255, 255, 255, 0.10);
   --topbar-pill-bg: rgba(255, 255, 255, 0.10);
   --topbar-well: rgba(0, 0, 0, 0.18);
+  --topbar-shadow: rgba(0, 0, 0, 0.45);
 
   --ok: #6fbf73;
   --ok-soft: #1f3324;
@@ -346,6 +349,7 @@ html[data-theme="ice"] {
   --topbar-line: rgba(13, 42, 54, 0.20);
   --topbar-pill-bg: rgba(255, 255, 255, 0.55);
   --topbar-well: rgba(13, 42, 54, 0.10);
+  --topbar-shadow: rgba(13, 42, 54, 0.16);
 
   --ok: #2f8f7a;
   --ok-soft: #e2f5f1;
@@ -442,7 +446,7 @@ html[data-theme="ice"] {
   font-weight: 700;
   line-height: 24px;
   text-align: center;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 var(--topbar-shadow);
 }
 
 .brand-name {
@@ -450,7 +454,7 @@ html[data-theme="ice"] {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 0 var(--topbar-shadow);
 }
 
 .tabs {
@@ -952,6 +956,8 @@ html[data-theme="ice"] {
   box-shadow: inset 0 1px 2px var(--shadow);
 }
 
+/* Font Awesome, if it loads, sits inside buttons. Icons are never the only
+   label, so a missing icon font changes nothing but the glyph spacing. */
 .btn i,
 .btn .fa-solid { margin-right: 5px; }
 

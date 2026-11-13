@@ -1,0 +1,128 @@
+name: CI
+
+# Builds every project on .NET Framework 4.0, runs the test suite, checks the
+# Windows XP compatibility constraints, and publishes runnable artifacts.
+#
+# Everything here runs on windows-latest because the XP checks parse PE headers
+# and the client/launcher are Windows-only GUI applications.
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Show SDK info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore DartScape.slnx
+
+      - name: Build (Debug)
+        run: dotnet build DartScape.slnx -c Debug --no-restore
+
+      - name: Build (Release)
+        run: dotnet build DartScape.slnx -c Release --no-restore
+
+      # The cache is a 11 MB binary asset that lives in the repository, so the
+      # integration tests can run here exactly as they do locally.
+      - name: Run tests
+        run: |
+          $exe = "tests\DartScape.Tests\bin\Release\net40\DartScape.Tests.exe"
+          if (-not (Test-Path $exe)) { throw "Test runner not found at $exe" }
+          & $exe --cache "assets\cache317"
+          if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
+
+      - name: Check Windows XP compatibility
+        run: pwsh -NoProfile -File tools/check-xp.ps1
+
+      - name: Check standalone packaging
+        run: pwsh -NoProfile -File tools/check-standalone.ps1
+
+      - name: Package artifacts
+        run: pwsh -NoProfile -File tools/package.ps1 -Configuration Release
+
+      - name: Upload server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dartscape-server-${{ github.sha }}
+          path: artifacts/dist/server/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload client package
+        uses: actions/upload-artifact@v4
+        with:
+          name: dartscape-client-${{ github.sha }}
+          path: artifacts/dist/client/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload full distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dartscape-full-${{ github.sha }}
+          path: artifacts/dist/dartscape-*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.sha }}
+          path: |
+            tests/**/TestResults/**
+            artifacts/test/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download full distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: dartscape-full-${{ github.sha }}
+          path: dist
+
+      - name: List release files
+        run: Get-ChildItem -Recurse dist | Select-Object FullName, Length
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DartScape ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: dist/**

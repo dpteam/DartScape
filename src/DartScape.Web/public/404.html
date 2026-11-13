@@ -256,7 +256,7 @@
         if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
         document.documentElement.setAttribute('data-theme', t);
         var m = document.getElementById('themeColor');
-        var c = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
+        var c = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
         if (m && c[t]) { m.setAttribute('content', c[t]); }
       } catch (e) { /* storage disabled — light default is fine */ }
     }());
@@ -299,7 +299,7 @@
 <script>
   (function () {
     var KEY = 'dartscape.theme';
-    var COLORS = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
+    var COLORS = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
     var buttons = document.querySelectorAll('[data-theme-set]');
     var i;
 
