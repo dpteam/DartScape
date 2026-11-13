@@ -141,7 +141,7 @@ else {
         }
 
         foreach ($path in $untracked) {
-            $violations.Add(("src\{0}: on disk but not tracked by git (a .gitignore pattern is too broad?)" -f $path))
+            $violations.Add(("{0}: on disk but not tracked by git (a .gitignore pattern is too broad?)" -f $path))
         }
 
         Write-Host ("    {0} source files, {1} untracked" -f $sourceFiles.Count, $untracked.Count)
