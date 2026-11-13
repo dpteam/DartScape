@@ -6,7 +6,7 @@
 
 **A RuneScape-style world, built from scratch in C#, running on anything from Windows XP upwards.**
 
-[![CI](https://github.com/DartPower/DartScape/actions/workflows/ci.yml/badge.svg)](https://github.com/DartPower/DartScape/actions/workflows/ci.yml)
+[![CI](https://github.com/dpteam/DartScape/actions/workflows/ci.yml/badge.svg)](https://github.com/dpteam/DartScape/actions/workflows/ci.yml)
 [![.NET Framework 4.0](https://img.shields.io/badge/.NET%20Framework-4.0-512BD4)](https://dotnet.microsoft.com/)
 [![No dependencies](https://img.shields.io/badge/dependencies-none-success)]()
 [![Windows XP](https://img.shields.io/badge/Windows-XP%20SP3%2B-0078D6)]()

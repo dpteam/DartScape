@@ -163,7 +163,15 @@ namespace DartScape.Web
             if (limit > 500) limit = 500;
 
             LogRecord[] recent = Log.GetRecent(limit);
-            long baseSeq = Log.ErrorCount;
+
+            // Sequence numbers come from the total record count, not the error count.
+            // The old code used errors as the base, so a server with a clean log had a
+            // base of 0 and every line got a negative sequence number, which the
+            // "everything after `since`" filter then discarded. The panel showed an empty
+            // tail on the healthiest possible server.
+            long total = Log.TotalRecords;
+            long firstSeq = total - recent.Length + 1;
+            if (firstSeq < 1) firstSeq = 1;
 
             var json = new JsonBuilder(4096);
             json.BeginObject().Prop("ok", true);
@@ -173,7 +181,7 @@ namespace DartScape.Web
             for (int i = 0; i < recent.Length; i++)
             {
                 LogRecord record = recent[i];
-                long seq = baseSeq - recent.Length + i + 1;
+                long seq = firstSeq + i;
                 if (seq <= since) continue;
 
                 json.BeginObject()
@@ -187,7 +195,7 @@ namespace DartScape.Web
 
             json.EndArray();
 
-            json.Prop("nextSince", baseSeq);
+            json.Prop("nextSince", total);
             json.EndObject();
 
             response.Json(json.ToString());

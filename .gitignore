@@ -81,9 +81,13 @@ _ReSharper*/
 
 # Runtime state that must never be committed
 # (world saves, accounts, server logs, generated keys)
-runtime/
-data/accounts/
-data/characters/
+#
+# Anchored with a leading slash on purpose: an unanchored "runtime/" also matches
+# src/DartScape.Core/Runtime/, which silently kept the supervision code out of the
+# repository. CI caught it; nothing local would have.
+/runtime/
+/data/accounts/
+/data/characters/
 data/world/
 logs/
 *.log

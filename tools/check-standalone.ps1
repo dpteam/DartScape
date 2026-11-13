@@ -106,6 +106,48 @@ foreach ($config in @('Debug', 'Release')) {
 
 Write-Host '  Auditing repository hygiene...'
 
+# Every source file must be tracked. A .gitignore pattern that is too broad can
+# silently exclude a whole directory, which builds locally and fails only in CI
+# on a clean checkout. That is exactly how src/DartScape.Core/Runtime/ went
+# missing for a while.
+$gitAvailable = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+
+if (-not $gitAvailable) {
+    Write-Host '    git not available; skipping the tracked-files check' -ForegroundColor Yellow
+}
+else {
+    $tracked = @()
+    $trackedRaw = git -C $repoRoot ls-files 2>$null
+
+    if ($LASTEXITCODE -eq 0 -and $trackedRaw) {
+        $tracked = $trackedRaw | ForEach-Object { $_.Trim().Replace('/', '\') }
+    }
+
+    if ($tracked.Count -eq 0) {
+        Write-Host '    no tracked files reported; skipping' -ForegroundColor Yellow
+    }
+    else {
+        $sourceFiles = Get-ChildItem -Path (Join-Path $repoRoot 'src') -Recurse -File |
+            Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' }
+
+        $untracked = @()
+
+        foreach ($file in $sourceFiles) {
+            $relative = $file.FullName.Substring($repoRoot.Length).TrimStart('\')
+
+            if ($tracked -notcontains $relative) {
+                $untracked += $relative
+            }
+        }
+
+        foreach ($path in $untracked) {
+            $violations.Add(("src\{0}: on disk but not tracked by git (a .gitignore pattern is too broad?)" -f $path))
+        }
+
+        Write-Host ("    {0} source files, {1} untracked" -f $sourceFiles.Count, $untracked.Count)
+    }
+}
+
 $gitignore = Join-Path $repoRoot '.gitignore'
 
 if (-not (Test-Path $gitignore)) {

@@ -82,6 +82,7 @@ namespace DartScape.Core.Diagnostics
         private static string _role = "dartscape";
         private static int _initialised;
         private static long _errorCount;
+        private static long _totalRecords;
 
         /// <summary>True once <see cref="Configure(string,LogOptions)"/> has run.</summary>
         public static bool IsConfigured
@@ -109,6 +110,20 @@ namespace DartScape.Core.Diagnostics
         public static long ErrorCount
         {
             get { return Interlocked.Read(ref _errorCount); }
+        }
+
+        /// <summary>
+        /// Total number of records written since start, at any level.
+        /// </summary>
+        /// <remarks>
+        /// This is the sequence number the admin log tail advances by. It must count every
+        /// record, not just errors: using the error count as a base meant a server with a
+        /// clean log produced sequence numbers below zero, and the client's
+        /// "give me everything after N" filter discarded the whole buffer.
+        /// </remarks>
+        public static long TotalRecords
+        {
+            get { return Interlocked.Read(ref _totalRecords); }
         }
 
         /// <summary>
@@ -365,6 +380,7 @@ namespace DartScape.Core.Diagnostics
             }
 
             if (level >= LogLevel.Error) Interlocked.Increment(ref _errorCount);
+            Interlocked.Increment(ref _totalRecords);
 
             var record = new LogRecord
             {
