@@ -40,18 +40,32 @@ namespace DartScape.Client.Rendering
             // Sky. Only visible above the horizon where no terrain covers it.
             target.FillRect(viewX, viewY, viewWidth, viewHeight, Framebuffer.Rgb(30, 44, 64));
 
-            // The camera sits on the player's tile, and the player's own elevation lifts them
-            // up the screen. Adding that lift to the origin keeps the player centred instead
-            // of drifting towards the top of the view whenever they stand on a hill.
-            int cameraHeight = Terrain.RenderHeight(world.MyX + world.CameraOffsetX,
-                world.MyY + world.CameraOffsetY);
+            // The camera follows the SMOOTH position, not the tile: snapping it to whole tiles
+            // makes the entire world lurch once per tick even when the player is drawn smoothly.
+            //
+            // The fractional part of the camera position becomes a pixel offset on the origin,
+            // while the projection itself works in whole tiles. Without this split the fraction
+            // cancels out inside ScreenX and the world still snaps.
+            double cameraX = world.MySmoothX + world.CameraOffsetX;
+            double cameraY = world.MySmoothY + world.CameraOffsetY;
+
+            double fracX = cameraX - Math.Floor(cameraX);
+            double fracY = cameraY - Math.Floor(cameraY);
+
+            int cameraTileX = (int)Math.Floor(cameraX);
+            int cameraTileY = (int)Math.Floor(cameraY);
+
+            double cameraHeight = Terrain.SmoothHeight(cameraX, cameraY);
 
             var projection = new IsoProjection
             {
-                OriginX = viewX + viewWidth / 2,
-                OriginY = viewY + viewHeight / 2 + cameraHeight * IsoProjection.HeightStep,
-                CameraX = world.MyX + world.CameraOffsetX,
-                CameraY = world.MyY + world.CameraOffsetY,
+                OriginX = viewX + viewWidth / 2
+                          - (int)Math.Round((fracX - fracY) * IsoProjection.HalfWidth),
+                OriginY = viewY + viewHeight / 2
+                          - (int)Math.Round((fracX + fracY) * IsoProjection.HalfHeight)
+                          + (int)Math.Round(cameraHeight * IsoProjection.HeightStep),
+                CameraX = cameraTileX,
+                CameraY = cameraTileY,
                 Rotation = world.CameraRotation
             };
 
@@ -84,20 +98,26 @@ namespace DartScape.Client.Rendering
         }
 
         /// <summary>Collects players and NPCs with their interpolated world position.</summary>
-        private static List<EntityDrawable> CollectEntities(ClientWorld world, double interpolation)
+        private static List<EntityDrawable> CollectEntities(ClientWorld world, double localInterpolation)
         {
             var list = new List<EntityDrawable>(48);
+            long now = DartScape.Core.TimeUtil.MonotonicMs();
 
             for (int i = 0; i < world.Npcs.Length; i++)
             {
                 ClientNpc npc = world.Npcs[i];
                 if (npc == null || npc.Plane != world.MyPlane) continue;
 
+                // Each entity interpolates against its own last move, not the local tick.
+                // Interpolating a remote entity with our tick phase makes it slide backwards
+                // whenever the two phases disagree, which is the jitter that was visible.
+                double f = ClientWorld.EntityInterpolation(npc.MoveStartedMs, now);
+
                 list.Add(new EntityDrawable
                 {
                     Npc = npc,
-                    WorldX = npc.LastX + (npc.X - npc.LastX) * interpolation,
-                    WorldY = npc.LastY + (npc.Y - npc.LastY) * interpolation
+                    WorldX = npc.LastX + (npc.X - npc.LastX) * f,
+                    WorldY = npc.LastY + (npc.Y - npc.LastY) * f
                 });
             }
 
@@ -106,11 +126,17 @@ namespace DartScape.Client.Rendering
                 ClientPlayer player = world.Players[i];
                 if (player == null || player.Plane != world.MyPlane) continue;
 
+                // The local player uses the tick fraction supplied by the caller, because its
+                // steps are driven locally and that fraction is in phase with them.
+                double f = player.IsLocal
+                    ? localInterpolation
+                    : ClientWorld.EntityInterpolation(player.MoveStartedMs, now);
+
                 list.Add(new EntityDrawable
                 {
                     Player = player,
-                    WorldX = player.LastX + (player.X - player.LastX) * interpolation,
-                    WorldY = player.LastY + (player.Y - player.LastY) * interpolation
+                    WorldX = player.LastX + (player.X - player.LastX) * f,
+                    WorldY = player.LastY + (player.Y - player.LastY) * f
                 });
             }
 
@@ -215,7 +241,12 @@ namespace DartScape.Client.Rendering
                 if ((int)Math.Round(entity.WorldY) != tileY) continue;
 
                 int ex, ey;
-                projection.Project(entity.WorldX, entity.WorldY, Terrain.HeightAt(tileX, tileY), out ex, out ey);
+
+                // The height is sampled at the entity's fractional position, not at the tile it
+                // is standing on. A whole-tile height makes the sprite hop a height unit the
+                // moment it crosses a tile boundary on a slope, which is very visible.
+                projection.Project(entity.WorldX, entity.WorldY,
+                    Terrain.SmoothHeight(entity.WorldX, entity.WorldY), out ex, out ey);
 
                 if (entity.Player != null) DrawPlayer(target, entity.Player, ex, ey);
                 else DrawNpc(target, entity.Npc, ex, ey);
@@ -406,10 +437,10 @@ namespace DartScape.Client.Rendering
             }
         }
 
-        private void DrawOverhead(Framebuffer target, string text, int untilMs, int cx, int y)
+        private void DrawOverhead(Framebuffer target, string text, long untilMs, int cx, int y)
         {
             if (string.IsNullOrEmpty(text)) return;
-            if (Environment.TickCount > untilMs) return;
+            if (DartScape.Core.TimeUtil.MonotonicMs() > untilMs) return;
 
             int width = (int)_text.Measure(text, FontRenderer.Size.Small).Width + 8;
 

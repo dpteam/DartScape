@@ -41,6 +41,22 @@ namespace DartScape.Core
             return Environment.TickCount & 0x7FFFFFFFL;
         }
 
+        private static readonly System.Diagnostics.Stopwatch Monotonic = System.Diagnostics.Stopwatch.StartNew();
+
+        /// <summary>
+        /// Monotonic milliseconds since the process started, as a 64-bit value.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="UptimeMs"/> masks <c>Environment.TickCount</c> to 31 bits, so it wraps every
+        /// 24.8 days. Anything that subtracts two timestamps — movement interpolation, animation
+        /// phases — gets a wildly wrong delta on that tick. A stopwatch will not wrap in any
+        /// realistic session, so use this wherever a difference is taken.
+        /// </remarks>
+        public static long MonotonicMs()
+        {
+            return Monotonic.ElapsedMilliseconds;
+        }
+
         /// <summary>Formats a duration as "3d 4h 12m".</summary>
         public static string Describe(TimeSpan span)
         {

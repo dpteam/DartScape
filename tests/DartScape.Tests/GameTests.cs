@@ -388,6 +388,73 @@ namespace DartScape.Tests
                 Harness.Equal(1L, world.TickCount, "one tick");
             });
 
+            Harness.Test("a walk longer than the path cap still arrives", () =>
+            {
+                // A path is capped at 25 tiles, so a longer request would stop one tile short
+                // unless the server keeps re-pathing. Because the client walks itself, that one
+                // tile never gets corrected and the two positions stay out of step.
+                var config = new ServerConfig();
+                var world = new World(config);
+
+                const int startCentreX = 3222;
+                const int startCentreY = 3218;
+                const int length = 30;
+
+                world.RebuildCollision(startCentreX, startCentreY);
+
+                // Find a clear corridor east, so the test does not depend on where the
+                // procedural terrain happens to put a tree.
+                int startX = 0, startY = 0;
+
+                for (int y = startCentreY - 20; y <= startCentreY + 20 && startX == 0; y++)
+                {
+                    for (int x = startCentreX - 20; x <= startCentreX + 20; x++)
+                    {
+                        bool clear = true;
+
+                        // The start tile itself must be free as well: a step test only looks at
+                        // the destination, so a tree under the player would pass unnoticed.
+                        if (!world.Collision.IsWalkable(x, y)) continue;
+
+                        for (int i = 1; i <= length && clear; i++)
+                        {
+                            if (!world.Collision.CanStep(x + i - 1, y, x + i, y)) clear = false;
+                        }
+
+                        if (clear)
+                        {
+                            startX = x;
+                            startY = y;
+                            break;
+                        }
+                    }
+                }
+
+                Harness.True(startX != 0, "found an open corridor");
+
+                var player = new Player { Name = "Walker", NameKey = "walker" };
+                world.AddPlayer(player);
+
+                // A bare Player has no current levels, and IsDead treats that as dead, which
+                // would send it down the respawn path instead of the movement path.
+                player.RestoreStats();
+
+                player.Position = new Position(startX, startY, 0);
+                player.LastPosition = player.Position;
+
+                world.RebuildCollision(startX, startY);
+
+                player.WalkTo(new Position(startX + length, startY, 0), world.Paths);
+
+                Harness.Equal(PathFinder.MaxPathLength, player.Waypoints.Count, "the path is capped");
+                Harness.True(player.HasWalkDestination, "the destination is remembered");
+
+                for (int i = 0; i < length + 10; i++) world.Tick();
+
+                Harness.Equal(startX + length, player.Position.X, "arrived at the destination");
+                Harness.False(player.HasWalkDestination, "the destination is cleared on arrival");
+            });
+
             Harness.Test("a failing queued action does not stop the tick", () =>
             {
                 var config = new ServerConfig();

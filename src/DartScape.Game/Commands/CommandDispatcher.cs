@@ -316,7 +316,7 @@ namespace DartScape.Game.Commands
             player.Position = new Position(x, y, plane);
             player.LastPosition = player.Position;
             player.Teleported = true;
-            player.Waypoints.Clear();
+            player.StopWalking();
             player.View.Clear();
 
             result.Add("Teleported to " + x + ", " + y + ", plane " + plane + ".");

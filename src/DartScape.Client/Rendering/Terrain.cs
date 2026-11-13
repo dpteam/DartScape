@@ -34,6 +34,35 @@ namespace DartScape.Client.Rendering
             return WorldTerrain.HeightAt(x, y);
         }
 
+        /// <summary>
+        /// Elevation at a fractional world position, interpolated between tiles.
+        /// </summary>
+        /// <remarks>
+        /// Tile heights are whole numbers, so sampling the height of the tile an entity is
+        /// standing on makes it jump a whole height unit the instant it crosses a tile boundary
+        /// on a slope. At <see cref="IsoProjection.HeightStep"/> pixels per unit that is a
+        /// visible hop every step, and it is one of the reasons walking on hills looked jittery.
+        /// Interpolating turns the hop into a slope.
+        /// </remarks>
+        public static double SmoothHeight(double x, double y)
+        {
+            int x0 = (int)Math.Floor(x);
+            int y0 = (int)Math.Floor(y);
+
+            double tx = x - x0;
+            double ty = y - y0;
+
+            double h00 = WorldTerrain.HeightAt(x0, y0);
+            double h10 = WorldTerrain.HeightAt(x0 + 1, y0);
+            double h01 = WorldTerrain.HeightAt(x0, y0 + 1);
+            double h11 = WorldTerrain.HeightAt(x0 + 1, y0 + 1);
+
+            double top = h00 + (h10 - h00) * tx;
+            double bottom = h01 + (h11 - h01) * tx;
+
+            return top + (bottom - top) * ty;
+        }
+
         /// <summary>Terrain class for a tile.</summary>
         public static int TypeAt(int x, int y)
         {
@@ -239,13 +268,14 @@ namespace DartScape.Client.Rendering
         }
 
         /// <summary>Screen Y of a view-space point at the given elevation.</summary>
-        public int ScreenY(double vx, double vy, int height)
+        public int ScreenY(double vx, double vy, double height)
         {
-            return OriginY + (int)Math.Round((vx - CameraX + (vy - CameraY)) * HalfHeight) - height * HeightStep;
+            return OriginY
+                 + (int)Math.Round((vx - CameraX + (vy - CameraY)) * HalfHeight - height * HeightStep);
         }
 
         /// <summary>Projects a world point with elevation to a screen point.</summary>
-        public void Project(double worldX, double worldY, int height, out int sx, out int sy)
+        public void Project(double worldX, double worldY, double height, out int sx, out int sy)
         {
             double vx, vy;
             Rotate(worldX, worldY, Rotation, out vx, out vy);

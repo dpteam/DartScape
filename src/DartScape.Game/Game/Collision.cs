@@ -145,6 +145,19 @@ namespace DartScape.Game
             return index < 0 ? 0xFFFFFF : _flags[index];
         }
 
+        /// <summary>
+        /// True when a tile can be stood on at all, ignoring edge walls.
+        /// </summary>
+        /// <remarks>
+        /// A tile with a wall on one of its edges is still standable — the wall only blocks
+        /// movement across that edge. This tests the base mask only, which is what "is there
+        /// floor here that an entity could occupy" actually means.
+        /// </remarks>
+        public bool IsWalkable(int worldX, int worldY)
+        {
+            return (FlagsAt(worldX, worldY) & WalkMaskBase) == 0;
+        }
+
         /// <summary>Sets flags on a world tile, replacing what was there.</summary>
         public void SetFlags(int worldX, int worldY, int flags)
         {
@@ -585,13 +598,16 @@ namespace DartScape.Game
             }
 
             // --- backtrack ----------------------------------------------------
+            // The guard is the whole grid, not the path cap. Capping here truncates the path at
+            // the destination end, leaving a gap next to the player — which is a teleport, and a
+            // silent one. The cap is applied below, to the path in the order it is walked.
             int walkX = foundX;
             int walkY = foundY;
             int guard = 0;
 
             while (!(walkX == startX && walkY == startY))
             {
-                if (++guard > MaxPathLength + 2) break;
+                if (++guard > Size * Size) break;
 
                 int marker = _visited[walkY * Size + walkX];
                 if (marker == 0) break;

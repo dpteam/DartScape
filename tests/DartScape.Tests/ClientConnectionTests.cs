@@ -113,6 +113,57 @@ namespace DartScape.Tests
                 }
             });
 
+            Harness.Test("the client and the server agree on where the player is", () =>
+            {
+                // The client walks itself, so the two positions can drift apart without either
+                // side noticing. This is the end-to-end check that the reconciliation works:
+                // after walking and settling, both sides must name the same tile.
+                var config = new ClientConfig { Host = host, Port = port };
+                var world = new ClientWorld();
+                var client = new GameClient(config, world);
+
+                try
+                {
+                    client.Connect(host, port, "Probe" + Rng(), "probe-password");
+
+                    ConnectionState state = WaitForState(client, TimeSpan.FromSeconds(20));
+                    Harness.Equal((int)ConnectionState.Connected, (int)state,
+                        "connected (reason: " + (client.LastError ?? "none") + ")");
+
+                    Harness.True(WaitFor(() => world.Me != null, TimeSpan.FromSeconds(5)), "local player");
+
+                    client.WalkTo(world.MyX + 4, world.MyY);
+
+                    Harness.True(WaitFor(() => world.IsLocalWalking, TimeSpan.FromSeconds(5)),
+                        "the client started walking on the click");
+
+                    // The window normally advances the local player every frame; there is no
+                    // window here, so the test drives it. Without this the client never finishes
+                    // its path and the check below would be meaningless.
+                    DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+
+                    while (world.IsLocalWalking && DateTime.UtcNow < deadline)
+                    {
+                        world.AdvanceLocal(DartScape.Core.TimeUtil.MonotonicMs());
+                        Thread.Sleep(15);
+                    }
+
+                    Harness.False(world.IsLocalWalking, "the client finished walking");
+
+                    // Two ticks of silence is enough for the server to catch up and for the
+                    // client to reconcile against its final position.
+                    Thread.Sleep(1500);
+
+                    Harness.True(world.ServerX >= 0, "the server position is known");
+                    Harness.Equal(world.ServerX, world.MyX, "x agrees");
+                    Harness.Equal(world.ServerY, world.MyY, "y agrees");
+                }
+                finally
+                {
+                    client.Disconnect();
+                }
+            });
+
             Harness.Test("the client survives an idle connection without dropping it", () =>
             {
                 // This is the specific regression: a zero read timeout throws the moment

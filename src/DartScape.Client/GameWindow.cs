@@ -163,11 +163,20 @@ namespace DartScape.Client
 
             if (delta > 0.0001) Fps = Fps * 0.9 + (1.0 / delta) * 0.1;
 
-            // The server ticks at 600 ms; interpolate entity positions across that window.
-            double interpolation = (now * 1000.0 % 600.0) / 600.0;
+            // The local player is stepped by its own tick clock, and the same clock supplies the
+            // interpolation fraction, so the two are always in phase. Deriving the fraction from
+            // a free-running wall clock instead (which is what this used to do) makes the
+            // player appear to stutter: the render phase drifts against the tick that moved
+            // them, so a step sometimes renders backwards for a frame.
+            double interpolation = _world.AdvanceLocal(DartScape.Core.TimeUtil.MonotonicMs());
 
             Render(interpolation);
+
+            // Present on this tick rather than leaving it to the message loop. Invalidate alone
+            // only queues a paint, and WM_PAINT is dispatched when the queue goes idle, so under
+            // load a frame can be presented late and the animation visibly hitches.
             Invalidate();
+            Update();
         }
 
         private void Render(double interpolation)
@@ -495,13 +504,24 @@ namespace DartScape.Client
         private void HandleWorldClick(Point canvas, int viewWidth, int viewHeight)
         {
             // Convert the screen point back to a world tile through the same projection the
-            // renderer uses, including camera rotation and terrain elevation.
+            // renderer uses, including camera rotation, the sub-tile camera offset and terrain
+            // elevation.
+            double cameraX = _world.MySmoothX + _world.CameraOffsetX;
+            double cameraY = _world.MySmoothY + _world.CameraOffsetY;
+
+            double fracX = cameraX - Math.Floor(cameraX);
+            double fracY = cameraY - Math.Floor(cameraY);
+
+            int cameraTileX = (int)Math.Floor(cameraX);
+            int cameraTileY = (int)Math.Floor(cameraY);
+
             var projection = new IsoProjection
             {
-                OriginX = viewWidth / 2,
-                OriginY = viewHeight / 2 + Terrain.RenderHeight(_world.MyX, _world.MyY) * IsoProjection.HeightStep,
-                CameraX = _world.MyX + _world.CameraOffsetX,
-                CameraY = _world.MyY + _world.CameraOffsetY,
+                OriginX = viewWidth / 2 - (int)Math.Round((fracX - fracY) * IsoProjection.HalfWidth),
+                OriginY = viewHeight / 2 - (int)Math.Round((fracX + fracY) * IsoProjection.HalfHeight)
+                          + (int)Math.Round(Terrain.SmoothHeight(cameraX, cameraY) * IsoProjection.HeightStep),
+                CameraX = cameraTileX,
+                CameraY = cameraTileY,
                 Rotation = _world.CameraRotation
             };
 

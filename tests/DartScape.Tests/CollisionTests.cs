@@ -264,6 +264,25 @@ namespace DartScape.Tests
                     "capped at " + PathFinder.MaxPathLength + ", got " + path.Count);
             });
 
+            Harness.Test("a path longer than the cap still starts next to the player", () =>
+            {
+                // The cap truncates the path at the far end. Truncating at the near end instead
+                // leaves a gap between the player and the first waypoint, which teleports them —
+                // silently, because every remaining pair of waypoints is still adjacent.
+                var finder = new PathFinder(EmptyMap());
+
+                List<Position> path = finder.Find(new Position(3210, 3210, 0), new Position(3250, 3210, 0));
+
+                Harness.Equal(PathFinder.MaxPathLength, path.Count, "capped at 25");
+
+                Position first = path[0];
+                Harness.True(first.ChebyshevDistance(new Position(3210, 3210, 0)) == 1,
+                    "the first waypoint is adjacent to the player, got " + first);
+
+                Harness.True(path[path.Count - 1] != new Position(3250, 3210, 0),
+                    "the cap stops the path short");
+            });
+
             Harness.Test("walking to the current tile produces nothing", () =>
             {
                 var finder = new PathFinder(EmptyMap());

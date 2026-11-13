@@ -116,9 +116,6 @@ namespace DartScape.Client.Net
 
             world.MyIndex = index;
             world.MyPrivilege = privilege;
-            world.MyPlane = plane;
-            world.MyX = x;
-            world.MyY = y;
 
             // The local player is an entry in the same list as everyone else, so that
             // movement and appearance decoding work identically for it.
@@ -132,11 +129,11 @@ namespace DartScape.Client.Net
             me.Name = name;
             me.Privilege = privilege;
             me.IsLocal = true;
-            me.Plane = plane;
-            me.X = x;
-            me.Y = y;
-            me.LastX = x;
-            me.LastY = y;
+
+            // The initial position packet is authoritative: it is the only place the server says
+            // where the player is without a movement step. Forcing it also seeds the shadow
+            // position that later reconciliations compare against.
+            world.ForceLocalPosition(x, y, plane);
         }
 
         private static void DecodeContainer(ClientWorld world, PacketBuffer buffer)
@@ -231,23 +228,32 @@ namespace DartScape.Client.Net
             buffer.StartBitRead();
 
             // Local player movement.
-            if (buffer.ReadBits(1) == 1)
+            bool selfMoved = buffer.ReadBits(1) == 1;
+
+            if (!selfMoved)
+            {
+                // The server is standing still. That is the moment its position is final, so it
+                // is also the moment a disagreement is safe to correct.
+                world.NoteServerStep(0, 0);
+            }
+            else
             {
                 int type = buffer.ReadBits(2);
 
                 if (type == 0)
                 {
+                    world.NoteServerStep(0, 0);
                     observed.Add(world.MyIndex);
                 }
                 else if (type == 1)
                 {
-                    MoveLocal(world, buffer.ReadBits(3));
+                    NoteServerMove(world, buffer.ReadBits(3));
                     if (buffer.ReadBits(1) == 1) observed.Add(world.MyIndex);
                 }
                 else if (type == 2)
                 {
-                    MoveLocal(world, buffer.ReadBits(3));
-                    MoveLocal(world, buffer.ReadBits(3));
+                    NoteServerMove(world, buffer.ReadBits(3));
+                    NoteServerMove(world, buffer.ReadBits(3));
                     if (buffer.ReadBits(1) == 1) observed.Add(world.MyIndex);
                 }
                 else
@@ -258,19 +264,10 @@ namespace DartScape.Client.Net
                     int y = buffer.ReadBits(7);
                     int x = buffer.ReadBits(7);
 
-                    world.MyPlane = plane;
-                    world.MyX = x;
-                    world.MyY = y;
-
-                    ClientPlayer me = world.Me;
-                    if (me != null)
-                    {
-                        me.Plane = plane;
-                        me.X = x;
-                        me.Y = y;
-                        me.LastX = x;
-                        me.LastY = y;
-                    }
+                    // Type 3 is the server telling us we were moved absolutely: a teleport, a
+                    // respawn, or a correction it decided on. That is authoritative, so the
+                    // local prediction is discarded rather than reconciled.
+                    world.ForceLocalPosition(x, y, plane);
                     if (block) observed.Add(world.MyIndex);
                 }
             }
@@ -344,19 +341,17 @@ namespace DartScape.Client.Net
             }
         }
 
-        private static void MoveLocal(ClientWorld world, int direction)
+        /// <summary>
+        /// Feeds one of the server's movement bits for the local player into the shadow
+        /// position.
+        /// </summary>
+        /// <remarks>
+        /// The direction comes off the wire and is turned into a delta here rather than in the
+        /// world, so the world does not need to know the wire's direction numbering.
+        /// </remarks>
+        private static void NoteServerMove(ClientWorld world, int direction)
         {
-            ClientPlayer me = world.Me;
-            if (me == null) return;
-
-            me.LastX = me.X;
-            me.LastY = me.Y;
-
-            me.X += DirectionDeltaX(direction);
-            me.Y += DirectionDeltaY(direction);
-
-            world.MyX = me.X;
-            world.MyY = me.Y;
+            world.NoteServerStep(DirectionDeltaX(direction), DirectionDeltaY(direction));
         }
 
         private static void Move(ClientPlayer player, int direction)
@@ -367,6 +362,10 @@ namespace DartScape.Client.Net
             player.LastY = player.Y;
             player.X += DirectionDeltaX(direction);
             player.Y += DirectionDeltaY(direction);
+
+            // Restart this entity's interpolation from now, so it slides over the next tick
+            // rather than snapping to the new tile.
+            player.MoveStartedMs = DartScape.Core.TimeUtil.MonotonicMs();
         }
 
         /// <summary>Direction 0 = north, clockwise, matching the 317 encoding.</summary>
@@ -426,7 +425,7 @@ namespace DartScape.Client.Net
             if ((mask & 0x4) != 0)
             {
                 player.OverheadText = buffer.ReadString();
-                player.OverheadUntilMs = Environment.TickCount + 6000;
+                player.OverheadUntilMs = DartScape.Core.TimeUtil.MonotonicMs() + 6000;
             }
 
             if ((mask & 0x80) != 0)
@@ -438,7 +437,7 @@ namespace DartScape.Client.Net
 
                 string message = TextEncoding.GetString(text, 0, text.Length);
                 player.OverheadText = message;
-                player.OverheadUntilMs = Environment.TickCount + 6000;
+                player.OverheadUntilMs = DartScape.Core.TimeUtil.MonotonicMs() + 6000;
                 player.Privilege = rights;
 
                 if (!string.IsNullOrEmpty(message))
@@ -604,6 +603,8 @@ namespace DartScape.Client.Net
             npc.LastY = npc.Y;
             npc.X += DirectionDeltaX(direction);
             npc.Y += DirectionDeltaY(direction);
+
+            npc.MoveStartedMs = DartScape.Core.TimeUtil.MonotonicMs();
         }
 
         private static void DecodeNpcBlock(ClientNpc npc, PacketBuffer buffer)
@@ -639,7 +640,7 @@ namespace DartScape.Client.Net
             if ((mask & 0x80) != 0)
             {
                 npc.OverheadText = buffer.ReadString();
-                npc.OverheadUntilMs = Environment.TickCount + 6000;
+                npc.OverheadUntilMs = DartScape.Core.TimeUtil.MonotonicMs() + 6000;
             }
 
             if ((mask & 0x1) != 0) buffer.ReadUnsignedShort();

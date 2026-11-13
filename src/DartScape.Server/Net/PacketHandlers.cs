@@ -103,6 +103,20 @@ namespace DartScape.Server.Net
         // -- movement ---------------------------------------------------------
 
         /// <summary>
+        /// Tells the client where the server actually thinks the player is.
+        /// </summary>
+        /// <remarks>
+        /// The client walks itself, so a walk request the server refuses would otherwise leave
+        /// the client walking alone and the two positions would never agree again. Forcing an
+        /// absolute placement costs one update block and resynchronises them.
+        /// </remarks>
+        private static void ResyncClient(Player player)
+        {
+            player.StopWalking();
+            player.Teleported = true;
+        }
+
+        /// <summary>
         /// Handles a walk request in the original's format: a path, not a destination.
         /// </summary>
         /// <remarks>
@@ -128,6 +142,7 @@ namespace DartScape.Server.Net
             if (buffer.Remaining < 5)
             {
                 Log.Debug("Packets", "{0} sent a truncated walk packet.", player.Name);
+                ResyncClient(player);
                 return;
             }
 
@@ -137,6 +152,7 @@ namespace DartScape.Server.Net
             if (pairBytes < 0 || (pairBytes % 2) != 0)
             {
                 Log.Debug("Packets", "{0} sent a malformed walk packet ({1} bytes).", player.Name, buffer.Remaining);
+                ResyncClient(player);
                 return;
             }
 
@@ -144,6 +160,7 @@ namespace DartScape.Server.Net
             if (waypointCount < 1 || waypointCount > PathFinder.MaxPathLength)
             {
                 Log.Debug("Packets", "{0} sent {1} waypoints; refusing.", player.Name, waypointCount);
+                ResyncClient(player);
                 return;
             }
 
@@ -171,6 +188,7 @@ namespace DartScape.Server.Net
             if (Math.Max(dx, dy) > PathFinder.MaxPathLength)
             {
                 Log.Debug("Packets", "{0} asked to walk {1} tiles; clamped.", player.Name, Math.Max(dx, dy));
+                ResyncClient(player);
                 return;
             }
 

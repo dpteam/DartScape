@@ -95,6 +95,27 @@ namespace DartScape.Game
         /// <summary>Queued walking steps, in order. Cleared when a new destination arrives.</summary>
         public readonly List<Position> Waypoints = new List<Position>();
 
+        /// <summary>
+        /// Where the player asked to go, kept so a path that was truncated can be continued.
+        /// </summary>
+        /// <remarks>
+        /// A path is capped at 25 tiles. Without remembering the destination, a request that
+        /// ends exactly at the cap leaves the player one tile short, and because the client
+        /// walks itself it stays one tile ahead of the server for ever. Re-pathing when the
+        /// waypoint queue empties keeps the server walking until it actually arrives.
+        /// </remarks>
+        public Position WalkDestination;
+
+        /// <summary>True while <see cref="WalkDestination"/> is still being walked towards.</summary>
+        public bool HasWalkDestination;
+
+        /// <summary>Cancels walking and forgets where the player was heading.</summary>
+        public void StopWalking()
+        {
+            Waypoints.Clear();
+            HasWalkDestination = false;
+        }
+
         /// <summary>Direction the player is facing (0..7) or -1.</summary>
         public int FaceDirection = -1;
 
@@ -374,8 +395,20 @@ namespace DartScape.Game
         {
             Waypoints.Clear();
 
-            if (destination.Plane != Position.Plane) return;
-            if (destination.Equals(Position)) return;
+            if (destination.Plane != Position.Plane)
+            {
+                HasWalkDestination = false;
+                return;
+            }
+
+            if (destination.Equals(Position))
+            {
+                HasWalkDestination = false;
+                return;
+            }
+
+            WalkDestination = destination;
+            HasWalkDestination = true;
 
             if (pathFinder != null)
             {

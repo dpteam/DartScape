@@ -448,17 +448,30 @@ namespace DartScape.Client.Net
             if (from == to) return;
 
             List<Position> found = _paths != null ? _paths.Find(from, to) : null;
-            if (found != null && found.Count > 0) path.AddRange(found);
-            else path.Add(to);
+
+            // No path at all means nothing is reachable from here. Walking straight to the
+            // clicked tile in that case would be a teleport across whatever is in the way, so
+            // the click is simply ignored — the same as clicking a tile you cannot see.
+            if (found == null || found.Count == 0) return;
+
+            path.AddRange(found);
 
             if (path.Count > PathFinder.MaxPathLength)
             {
                 path.RemoveRange(PathFinder.MaxPathLength, path.Count - PathFinder.MaxPathLength);
             }
 
+            // Guard against a pathfinder result that does not start next to the player: a gap
+            // there is a teleport, and the walk would look like a jump.
+            if (path[0].ChebyshevDistance(from) != 1) return;
+
             int anchorX = path[0].X;
             int anchorY = path[0].Y;
             int count = path.Count;
+
+            // Move locally right now. The server is told the same path and will agree; this is
+            // what makes the step start on the click instead of a round trip later.
+            _world.SetLocalPath(path, DartScape.Core.TimeUtil.MonotonicMs());
 
             Send(164, buffer =>
             {

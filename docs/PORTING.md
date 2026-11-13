@@ -28,7 +28,64 @@ The port follows `Rs317.Library.Client`, because it is the faithful one.
 | Pathfinding | Ported BFS with the original's marker encoding, queue size and goal test. |
 | Walk packet | Ported: path from the client, `LEShortA` anchor, signed-byte deltas, run byte. |
 | Server validation | Every step re-checked against the server's own map. |
+| Local movement | The client moves itself and interpolates; the server validates and reconciles. |
 | Terrain → collision | Procedural stand-in until the landscape loader exists. |
+
+---
+
+## 0. Movement, end to end
+
+This is the part that felt broken for a long time, so it is worth writing down as a
+pipeline rather than a set of rules.
+
+**On the click.** The client converts the pixel to a tile, pathfinds locally, and
+**takes the first step on that same frame**. It does not wait for a tick boundary
+and it does not wait for the server. It then sends the whole path, so the server
+knows the intent.
+
+**Every frame after that.** `ClientWorld.AdvanceLocal` drains whole ticks off its
+own clock and returns a fraction in `0..1` for the current step. That fraction is
+used for three things, and they must all come from the *same* value or the motion
+tears:
+
+* the local player's drawn position, `LastX + (X - LastX) * fraction`;
+* the camera position, via `MySmoothX` / `MySmoothY`;
+* the click-to-tile projection, which must reconstruct the identical camera.
+
+**On the server.** It receives a destination, re-paths from its own collision map,
+and applies one tile per tick, two when running. It never trusts the client's
+tiles, only its intent.
+
+**When they disagree.** The client tracks a *shadow* position from the server's
+movement bits but does not render it. A correction is applied only when the client
+is standing still **and** the server has stopped moving, which is the one moment a
+snap is invisible. Correcting while either side is still walking is what produced
+the rubber-banding.
+
+### The six things that caused the stutter
+
+Each of these alone is enough to make movement look like it is lagging.
+
+| Cause | Effect |
+|---|---|
+| The client waited for the server's step | Stand, then jump one tile, every tile |
+| The camera snapped to whole tiles | The whole world lurched once per tick |
+| Height sampled per tile | A hop on every slope, once per tile |
+| The interpolation phase came from a free-running clock | The render phase drifted against the tick and occasionally rendered backwards |
+| The server's step was applied on top of the client's | Two tiles of movement per tile |
+| A long path was truncated at the near end | A silent gap between the player and the first waypoint, i.e. a teleport |
+
+The last one is worth spelling out because the tests only caught it by asserting
+that **every consecutive pair of waypoints is exactly one tile apart** — the gap was
+at the *start* of the path, where a "does it reach the destination" test never
+looks.
+
+### Timestamps
+
+Anything that subtracts two timestamps uses `TimeUtil.MonotonicMs()`, not
+`Environment.TickCount`. The latter is 32-bit and wraps every 24.8 days; a wrap
+during a subtraction produces a delta of about −2³¹ ms, which freezes or teleports
+every interpolated entity at once.
 
 ---
 
@@ -216,9 +273,19 @@ why clicking the corner of a diagonal NPC walks instead of attacking.
 
 ### 4.4 Run
 
-`RunEnabled` is read from the walk packet's trailing byte, but energy drain and the
-per-step accounting are not yet correct: the original only allows two steps when
-the path is long enough, and drains per step.
+`RunEnabled` is read from the walk packet's trailing byte and the server applies two
+tiles per tick while energy lasts, draining 100 per step. What is still missing is
+the original's guard: it only takes the second step when the remaining path is long
+enough, and the client's own prediction does not run at two tiles per tick yet — so
+running currently makes the client one step behind per tick rather than visibly
+faster.
+
+### 4.5 Path continuation
+
+The server remembers the requested destination (`Player.WalkDestination`) and
+re-paths when the 25-tile queue empties, so a long click actually arrives instead of
+stopping a tile short. The client still caps at 25 and stops, which is correct for
+the original but means a click further than 25 tiles needs a second click.
 
 ---
 

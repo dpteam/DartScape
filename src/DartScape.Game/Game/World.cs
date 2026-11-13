@@ -668,8 +668,7 @@ namespace DartScape.Game
                 player.Teleported = true;
                 player.DeathTicks = 0;
                 player.RestoreStats();
-                player.WalkTo(new Position(player.Position.X, player.Position.Y, player.Position.Plane), Paths);
-                player.Waypoints.Clear();
+                player.StopWalking();
                 player.CombatTargetNpc = -1;
                 player.CombatTargetPlayer = -1;
                 player.View.Clear();
@@ -730,9 +729,12 @@ namespace DartScape.Game
 
         private void TickMovement(Player player)
         {
-            if (player.Waypoints.Count == 0) return;
+            if (player.Waypoints.Count == 0 && !player.HasWalkDestination) return;
 
             EnsureCollisionCovers(player);
+
+            ContinueWalk(player);
+            if (player.Waypoints.Count == 0) return;
 
             int steps = player.RunEnabled && player.RunEnergy > 0 ? 2 : 1;
 
@@ -747,7 +749,12 @@ namespace DartScape.Game
                 if (Collision != null && !Collision.CanStep(player.Position.X, player.Position.Y, next.X, next.Y))
                 {
                     Log.Debug("World", "{0} tried to step into a blocked tile at {1}.", player.Name, next);
-                    player.Waypoints.Clear();
+                    player.StopWalking();
+
+                    // Force an absolute placement back to the last legal tile. The client walks
+                    // itself and does not apply our movement bits, so without this it would keep
+                    // walking through whatever it thinks is in the way.
+                    player.Teleported = true;
                     break;
                 }
 
@@ -772,6 +779,36 @@ namespace DartScape.Game
             }
 
             if (player.MovedThisTick) player.LastActivityUtc = DateTime.UtcNow;
+
+            ContinueWalk(player);
+        }
+
+        /// <summary>
+        /// Keeps walking when the waypoint queue empties before the destination is reached.
+        /// </summary>
+        /// <remarks>
+        /// A path is capped at 25 tiles, so a request that long leaves the player one tile short
+        /// if the queue is simply allowed to run out. Because the client walks itself, that one
+        /// tile never gets corrected and the two positions stay out of step until something else
+        /// forces a resync. Re-pathing from the new position costs one search per path and makes
+        /// the server actually arrive.
+        /// </remarks>
+        private void ContinueWalk(Player player)
+        {
+            if (!player.HasWalkDestination) return;
+            if (player.Waypoints.Count > 0) return;
+
+            if (player.Position.Equals(player.WalkDestination))
+            {
+                player.HasWalkDestination = false;
+                return;
+            }
+
+            Position destination = player.WalkDestination;
+            player.WalkTo(destination, Paths);
+
+            // Nothing reachable: stop rather than searching again every tick for ever.
+            if (player.Waypoints.Count == 0) player.HasWalkDestination = false;
         }
 
         private void TickCombat(Player player)
