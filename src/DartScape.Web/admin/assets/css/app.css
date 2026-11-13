@@ -1281,9 +1281,15 @@ html[data-theme="dark"] .input:focus {
 .lv-error { color: var(--err); }
 .lv-other { color: var(--muted); }
 
-.log-line.lv-row-warn { border-left-color: var(--warn); }
-.log-line.lv-row-error { border-left-color: var(--err); background: var(--err-soft); }
-.log-line.lv-row-warn { background: var(--warn-soft); }
+.log-line.lv-row-warn {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.log-line.lv-row-error {
+  border-left-color: var(--err);
+  background: var(--err-soft);
+}
 
 .logfoot {
   display: flex;
@@ -1702,6 +1708,18 @@ body.modal-open {
 
   .logbox {
     height: 44vh;
+  }
+
+  /* Below 560px the log row stacks: timestamp/level/category, then the text
+     on its own line. Side by side leaves the message ~100px wide. */
+  .log-line {
+    flex-wrap: wrap;
+    gap: 0 6px;
+    padding: 3px 8px;
+  }
+
+  .log-text {
+    flex: 1 1 100%;
   }
 }
 

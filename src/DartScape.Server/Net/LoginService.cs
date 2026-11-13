@@ -93,13 +93,19 @@ namespace DartScape.Server.Net
                     return LoginResult.Malformed;
                 }
 
-                // --- step 2: server seed + "continue" ------------------------
+                // --- step 2: server seed, status and public modulus ---------
+                // The modulus is sent here rather than shipped with the client so that
+                // rotating the login key does not require a client update. It is public
+                // information by definition, and it travels before anything secret.
                 long serverSeed = NextInt64();
-                var seedBytes = new byte[9];
-                for (int i = 0; i < 8; i++) seedBytes[i] = (byte)(serverSeed >> (56 - i * 8));
-                seedBytes[8] = 0;                    // status: continue
+                byte[] modulus = _key.ModulusBytes;
 
-                stream.Write(seedBytes, 0, seedBytes.Length);
+                var greeting = new byte[9 + modulus.Length];
+                for (int i = 0; i < 8; i++) greeting[i] = (byte)(serverSeed >> (56 - i * 8));
+                greeting[8] = 0;                    // status: continue
+                Buffer.BlockCopy(modulus, 0, greeting, 9, modulus.Length);
+
+                stream.Write(greeting, 0, greeting.Length);
                 stream.Flush();
 
                 // --- step 3: encrypted credentials ---------------------------

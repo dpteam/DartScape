@@ -30,6 +30,7 @@ namespace DartScape.Core.Protocol
         private int _readPos;
         private int _writePos;
         private int _bitPos;
+        private int _readBitPos;
 
         /// <summary>Creates a buffer with the given initial capacity.</summary>
         public PacketBuffer(int capacity = 256)
@@ -354,8 +355,40 @@ namespace DartScape.Core.Protocol
             if (_bitPos > _writePos * 8) _writePos = (_bitPos + 7) / 8;
         }
 
-        // -- reading ----------------------------------------------------------
+        // -- bit reading ------------------------------------------------------
 
+        /// <summary>Begins bit-level reading at the current byte position.</summary>
+        public void StartBitRead()
+        {
+            _readBitPos = _readPos * 8;
+        }
+
+        /// <summary>Ends bit-level reading and moves the byte cursor past the last bit read.</summary>
+        public void FinishBitRead()
+        {
+            _readPos = (_readBitPos + 7) / 8;
+            _readBitPos = 0;
+        }
+
+        /// <summary>Reads <paramref name="count"/> bits (max 32), most significant first.</summary>
+        public int ReadBits(int count)
+        {
+            if (count <= 0) return 0;
+            if (count > 32) throw new ProtocolException("Bit count out of range: " + count);
+            if (_readBitPos + count > _writePos * 8) throw new ProtocolException("Bit read past end of packet.");
+
+            int value = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int byteIndex = _readBitPos >> 3;
+                int bitIndex = 7 - (_readBitPos & 7);
+                value = (value << 1) | ((_data[byteIndex] >> bitIndex) & 1);
+                _readBitPos++;
+            }
+            return value;
+        }
+
+        // -- reading ----------------------------------------------------------
         private void Require(int count)
         {
             if (_readPos + count > _writePos)
@@ -390,6 +423,13 @@ namespace DartScape.Core.Protocol
         {
             Require(1);
             return (-_data[_readPos++]) & 0xFF;
+        }
+
+        /// <summary>Reads a byte written by <see cref="WriteByteS"/> as a plain unsigned value.</summary>
+        public int ReadUnsignedByteA()
+        {
+            Require(1);
+            return (_data[_readPos++] - 128) & 0xFF;
         }
 
         public int ReadUnsignedShort()

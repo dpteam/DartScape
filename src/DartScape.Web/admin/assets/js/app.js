@@ -630,14 +630,19 @@
     }
 
     var count = typeof world.playersOnline === 'number' ? world.playersOnline : 0;
+    setPlayerBadge(count);
+
+    dom.overviewUpdated.textContent = 'Updated ' + fmtClock(nowSec());
+  }
+
+  function setPlayerBadge(count) {
+    if (!dom.navPlayerCount) { return; }
     if (count > 0) {
       dom.navPlayerCount.textContent = String(count);
       dom.navPlayerCount.hidden = false;
     } else {
       dom.navPlayerCount.hidden = true;
     }
-
-    dom.overviewUpdated.textContent = 'Updated ' + fmtClock(nowSec());
   }
 
   /* 8. PLAYERS ------------------------------------------------------------ */
@@ -677,6 +682,7 @@
     dom.playersBody.appendChild(frag);
 
     dom.playerCount.textContent = q ? (shown.length + ' / ' + all.length) : String(all.length);
+    if (!q) { setPlayerBadge(all.length); }
 
     if (shown.length === 0) {
       dom.playersEmpty.hidden = false;
@@ -813,7 +819,8 @@
 
     var hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = 'Delivered through the server console as ::msg ' + name + ' <text>.';
+    hint.textContent = 'Sent through the command dispatcher as “::msg ' + name +
+      ' <text>”, so the reply appears in the Console tab.';
 
     wrap.appendChild(intro);
     wrap.appendChild(label);
@@ -833,15 +840,22 @@
           input.focus();
           return;
         }
-        apiPost('api/admin/command', { text: '::msg ' + name + ' ' + text }, function (err) {
+        var command = '::msg ' + name + ' ' + text;
+        apiPost('api/admin/command', { text: command }, function (err, data) {
           done();
           if (err) {
             input.focus();
             return;
           }
           closeModal();
+          appendConsole('cmd', '> ' + command);
+          var output = (data && data.output) || [];
+          if (output.length) {
+            for (var i = 0; i < output.length; i++) { appendConsole('out', output[i]); }
+          } else {
+            appendConsole('sys', '(no output)');
+          }
           toast('success', 'Message sent to ' + name + '.');
-          appendConsole('sys', 'Message to ' + name + ': ' + text);
         });
       }
     });

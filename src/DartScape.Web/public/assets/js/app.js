@@ -31,7 +31,7 @@
 
   var THEME_KEY = 'dartscape.theme';
   var THEMES = ['light', 'dark', 'ice'];
-  var THEME_COLORS = { light: '#4a76a8', dark: '#22374f', ice: '#3a9ec6' };
+  var THEME_COLORS = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -715,10 +715,18 @@
     setText(byId('connect-port'), ':' + state.port);
   }
 
-  /* execCommand first (works over plain http), clipboard API as a bonus. */
-  function copyText(text) {
+  /* execCommand first (works over plain http and on old browsers), the async
+     clipboard API second. The callback always fires exactly once. */
+  function copyText(text, done) {
     var ok = false;
     var area = null;
+    var finished = false;
+
+    function finish(result) {
+      if (finished) { return; }
+      finished = true;
+      done(result);
+    }
 
     try {
       area = document.createElement('textarea');
@@ -737,23 +745,32 @@
 
     if (area && area.parentNode) { area.parentNode.removeChild(area); }
 
-    if (!ok && navigator.clipboard && navigator.clipboard.writeText) {
+    if (ok) { finish(true); return; }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
-        navigator.clipboard.writeText(text);
-        ok = true;
-      } catch (e3) { ok = false; }
+        var promise = navigator.clipboard.writeText(text);
+        if (promise && typeof promise.then === 'function') {
+          promise.then(function () { finish(true); }, function () { finish(false); });
+          return;
+        }
+        finish(true);
+        return;
+      } catch (e3) { /* fall through to the failure toast */ }
     }
 
-    return ok;
+    finish(false);
   }
 
   function handleCopy() {
     var text = state.address + ':' + state.port;
-    if (copyText(text)) {
-      toast('Copied ' + text + ' to the clipboard.');
-    } else {
-      toast('Could not copy — the address is ' + text + '.');
-    }
+    copyText(text, function (ok) {
+      if (ok) {
+        toast('Copied ' + text + ' to the clipboard.');
+      } else {
+        toast('Could not copy — the address is ' + text + '.');
+      }
+    });
   }
 
   /* ------------------------------------------------------------------------

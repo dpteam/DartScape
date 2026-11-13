@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DartScape — World Status</title>
   <meta name="description" content="Live world status, online players, hiscores and news for the DartScape world.">
-  <meta name="theme-color" content="#4a76a8" id="themeColor">
+  <meta name="theme-color" content="#45688e" id="themeColor">
   <meta name="color-scheme" content="light dark">
 
   <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
@@ -32,7 +32,7 @@
         if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
         document.documentElement.setAttribute('data-theme', t);
         var m = document.querySelector('meta[name="theme-color"]');
-        var c = { light: '#4a76a8', dark: '#22374f', ice: '#3a9ec6' };
+        var c = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
         if (m && c[t]) { m.setAttribute('content', c[t]); }
       } catch (e) { /* private mode / disabled storage — keep the light default. */ }
     }());
@@ -68,7 +68,7 @@
       </div>
 
       <button type="button" class="btn btn--play" id="play-btn">
-        <i class="fa-solid fa-play" aria-hidden="true"></i><span class="btn-play-label">Play</span>
+        <span class="play-glyph" aria-hidden="true">&#9654;</span><span class="btn-play-label">Play</span>
       </button>
     </div>
   </div>

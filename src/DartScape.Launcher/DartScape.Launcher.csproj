@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>DartScape.Launcher</RootNamespace>
+    <AssemblyName>DartScape.Launcher</AssemblyName>
+    <Description>DartScape launcher: MSHTML shell, server browser, settings.</Description>
+    <ApplicationIcon>..\..\assets\icon\dartscape.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DartScape.Core\DartScape.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\ui.html" />
+    <EmbeddedResource Include="Assets\theme.css" />
+    <EmbeddedResource Include="Assets\app.js" />
+  </ItemGroup>
+
+</Project>

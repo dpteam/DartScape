@@ -1,0 +1,351 @@
+/* ---------------------------------------------------------------------------
+   DartScape launcher theme.
+
+   Rendered by MSHTML, so: no flexbox, no CSS variables, no grid, no gradients
+   that depend on modern syntax. Everything here is plain CSS 2.1 plus the few
+   IE-specific extras that MSHTML actually understands.
+
+   The three themes are expressed by swapping a class on <body>. That is more
+   verbose than custom properties, and it is the only thing that works in the
+   engine that ships with Windows XP.
+   --------------------------------------------------------------------------- */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: Tahoma, "Segoe UI", Verdana, Arial, sans-serif;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+/* --- light (default) ---------------------------------------------------- */
+
+body, body.theme-light {
+  background: #dfe6ee;
+  color: #223044;
+}
+
+body.theme-light .shell      { background: #dfe6ee; }
+body.theme-light .titlebar   { background: #4a76a8; border-bottom: 1px solid #345d8a; }
+body.theme-light .card       { background: #ffffff; border: 1px solid #c3d0df; }
+body.theme-light .cardhead   { background: #eef3f9; border-bottom: 1px solid #d7e0ea; color: #35679e; }
+body.theme-light .tabs       { background: #eef3f9; border-bottom: 1px solid #c3d0df; }
+body.theme-light .tab        { background: #eef3f9; color: #3c4d63; border-right: 1px solid #d7e0ea; }
+body.theme-light .tab.active { background: #ffffff; color: #35679e; font-weight: bold; }
+body.theme-light input[type=text],
+body.theme-light input[type=password] { background: #ffffff; border: 1px solid #c9d5e3; color: #223044; }
+body.theme-light .btn        { background: #f4f7fb; border: 1px solid #c3d0df; color: #223044; }
+body.theme-light .btn:hover  { background: #e8eff8; }
+body.theme-light .footer     { background: #eef3f9; border-top: 1px solid #c3d0df; color: #6d7e93; }
+body.theme-light .worlds .row2 { border-bottom: 1px solid #e4ebf3; }
+body.theme-light .worlds .row2:hover { background: #f4f8fc; }
+
+/* --- dark --------------------------------------------------------------- */
+
+body.theme-dark {
+  background: #14181f;
+  color: #d8dee8;
+}
+
+body.theme-dark .shell      { background: #14181f; }
+body.theme-dark .titlebar   { background: #1e2a3a; border-bottom: 1px solid #2f3f54; }
+body.theme-dark .card       { background: #1c222c; border: 1px solid #2f3f54; }
+body.theme-dark .cardhead   { background: #232b37; border-bottom: 1px solid #2f3f54; color: #7fb0e0; }
+body.theme-dark .tabs       { background: #1a202a; border-bottom: 1px solid #2f3f54; }
+body.theme-dark .tab        { background: #1a202a; color: #9aa8bb; border-right: 1px solid #2f3f54; }
+body.theme-dark .tab.active { background: #1c222c; color: #7fb0e0; font-weight: bold; }
+body.theme-dark input[type=text],
+body.theme-dark input[type=password] { background: #10151c; border: 1px solid #33445a; color: #d8dee8; }
+body.theme-dark .btn        { background: #232b37; border: 1px solid #33445a; color: #d8dee8; }
+body.theme-dark .btn:hover  { background: #2b3644; }
+body.theme-dark .footer     { background: #1a202a; border-top: 1px solid #2f3f54; color: #7a889c; }
+body.theme-dark .worlds .row2 { border-bottom: 1px solid #232b37; }
+body.theme-dark .worlds .row2:hover { background: #232b37; }
+
+/* --- ice ---------------------------------------------------------------- */
+
+body.theme-ice {
+  background: #eaf4f8;
+  color: #1d3a44;
+}
+
+body.theme-ice .shell      { background: #eaf4f8; }
+body.theme-ice .titlebar   { background: #4aa3c4; border-bottom: 1px solid #2f7d99; }
+body.theme-ice .card       { background: #ffffff; border: 1px solid #b8dce8; }
+body.theme-ice .cardhead   { background: #e8f6fb; border-bottom: 1px solid #b8dce8; color: #1e7a96; }
+body.theme-ice .tabs       { background: #e8f6fb; border-bottom: 1px solid #b8dce8; }
+body.theme-ice .tab        { background: #e8f6fb; color: #2b5f70; border-right: 1px solid #b8dce8; }
+body.theme-ice .tab.active { background: #ffffff; color: #1e7a96; font-weight: bold; }
+body.theme-ice input[type=text],
+body.theme-ice input[type=password] { background: #ffffff; border: 1px solid #a8d4e2; color: #1d3a44; }
+body.theme-ice .btn        { background: #f2fbfe; border: 1px solid #b8dce8; color: #1d3a44; }
+body.theme-ice .btn:hover  { background: #e0f3f9; }
+body.theme-ice .footer     { background: #e8f6fb; border-top: 1px solid #b8dce8; color: #5a8290; }
+body.theme-ice .worlds .row2 { border-bottom: 1px solid #d9eef5; }
+body.theme-ice .worlds .row2:hover { background: #f2fbfe; }
+
+/* --- layout ------------------------------------------------------------- */
+
+.shell {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+}
+
+.titlebar {
+  height: 62px;
+  padding: 10px 14px;
+  position: relative;
+}
+
+.brand { float: left; }
+
+.logo {
+  float: left;
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
+  font-family: Georgia, serif;
+  font-size: 26px;
+  font-weight: bold;
+  color: #f6d678;
+  background: #16283c;
+  border: 2px solid #d6aa4a;
+  border-radius: 8px;
+  margin-right: 10px;
+}
+
+.brandtext { float: left; padding-top: 3px; }
+
+.brandtext .name {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 0.4px;
+}
+
+.brandtext .tagline {
+  font-size: 10px;
+  color: #cfe0f0;
+  margin-top: 1px;
+}
+
+.theme { float: right; padding-top: 9px; }
+
+.tbtn {
+  font-family: Tahoma, sans-serif;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #b9c6d6;
+  border-radius: 4px;
+  color: #2b3a4d;
+}
+
+.tbtn:hover { background: #eaf1f8; }
+
+.tabs {
+  height: 30px;
+  padding-left: 8px;
+  clear: both;
+}
+
+.tab {
+  float: left;
+  height: 30px;
+  padding: 0 16px;
+  line-height: 30px;
+  font-family: Tahoma, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  border-top: none;
+}
+
+.page {
+  position: absolute;
+  left: 0; right: 0;
+  top: 92px;
+  bottom: 26px;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+
+.hidden { display: none; }
+
+.card {
+  margin-bottom: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cardhead {
+  padding: 7px 10px;
+  font-weight: bold;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cardhead .mini {
+  float: right;
+  font-size: 10px;
+  padding: 1px 8px;
+  cursor: pointer;
+  border: 1px solid #b9c6d6;
+  background: #ffffff;
+  border-radius: 3px;
+  text-transform: none;
+  font-weight: normal;
+}
+
+.cardbody { padding: 10px; }
+
+.field { margin-bottom: 12px; }
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.field input[type=text],
+.field input[type=password] {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: Tahoma, sans-serif;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.field input.small { width: 70px; }
+
+.times { padding: 0 6px; color: #8a99ab; }
+
+.hint {
+  font-size: 10px;
+  color: #8a99ab;
+  margin-top: 3px;
+}
+
+.row { margin-top: 4px; }
+
+.btn {
+  font-family: Tahoma, sans-serif;
+  font-size: 11px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-right: 4px;
+}
+
+.pill {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: #e2e9f1;
+  color: #55677d;
+  margin-left: 6px;
+}
+
+.pill.ok  { background: #d6efdc; color: #1f6b38; }
+.pill.bad { background: #f8dcd9; color: #8f2a20; }
+
+.launchbar {
+  margin-top: 4px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #c3d0df;
+  border-radius: 6px;
+}
+
+body.theme-dark .launchbar { background: #1c222c; border-color: #2f3f54; }
+body.theme-ice  .launchbar { background: #ffffff; border-color: #b8dce8; }
+
+.play {
+  width: 100%;
+  padding: 12px;
+  font-family: Tahoma, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffffff;
+  background: #4a76a8;
+  border: 1px solid #345d8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.play:hover { background: #5686bb; }
+.play:active { background: #3f6a99; }
+.play.disabled { background: #9aa8bb; border-color: #8794a6; cursor: default; }
+
+.status {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #55677d;
+  min-height: 16px;
+}
+
+body.theme-dark .status { color: #9aa8bb; }
+body.theme-ice  .status { color: #2b5f70; }
+
+.status.error { color: #b93a2c; font-weight: bold; }
+.status.good  { color: #2f8f57; }
+
+/* --- world list --------------------------------------------------------- */
+
+.worlds .row2 {
+  padding: 8px 4px;
+}
+
+.worlds .row2 .wname {
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.worlds .row2 .wmeta {
+  font-size: 10px;
+  color: #8a99ab;
+  margin-top: 2px;
+}
+
+.worlds .row2 .wjoin {
+  float: right;
+  font-size: 10px;
+  padding: 3px 10px;
+  cursor: pointer;
+  border: 1px solid #b9c6d6;
+  background: #ffffff;
+  border-radius: 3px;
+}
+
+.empty {
+  padding: 16px 4px;
+  font-size: 11px;
+  color: #8a99ab;
+  text-align: center;
+}
+
+/* --- about -------------------------------------------------------------- */
+
+.about p { margin: 0 0 8px 0; line-height: 1.5; }
+.about .muted { font-size: 10px; color: #8a99ab; }
+
+/* --- footer ------------------------------------------------------------- */
+
+.footer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 26px;
+  padding: 6px 12px;
+  font-size: 10px;
+}
+
+#footVersion { float: right; }

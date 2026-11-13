@@ -138,8 +138,8 @@ strong, b { font-weight: 700; }
 
   --text: #26313d;
   --text-strong: #16222e;
-  --text-muted: #6d7f92;
-  --text-faint: #93a3b3;
+  --text-muted: #5c6d80;
+  --text-faint: #6f8093;
 
   --link: #2b587a;
   --link-hover: #1d4361;
@@ -148,10 +148,10 @@ strong, b { font-weight: 700; }
   --accent-strong: #2f5b86;
   --accent-soft: #eaf1f9;
 
-  --topbar-bg: #4a76a8;
-  --topbar-edge: #3a608c;
+  --topbar-bg: #45688e;
+  --topbar-edge: #35557a;
   --topbar-text: #ffffff;
-  --topbar-dim: #d3e3f3;
+  --topbar-dim: #d9e6f4;
   --topbar-hover: rgba(255, 255, 255, 0.12);
   --topbar-active: rgba(255, 255, 255, 0.18);
   --topbar-line: rgba(255, 255, 255, 0.16);
@@ -198,8 +198,8 @@ html[data-theme="light"] {
 
   --text: #26313d;
   --text-strong: #16222e;
-  --text-muted: #6d7f92;
-  --text-faint: #93a3b3;
+  --text-muted: #5c6d80;
+  --text-faint: #6f8093;
 
   --link: #2b587a;
   --link-hover: #1d4361;
@@ -208,10 +208,10 @@ html[data-theme="light"] {
   --accent-strong: #2f5b86;
   --accent-soft: #eaf1f9;
 
-  --topbar-bg: #4a76a8;
-  --topbar-edge: #3a608c;
+  --topbar-bg: #45688e;
+  --topbar-edge: #35557a;
   --topbar-text: #ffffff;
-  --topbar-dim: #d3e3f3;
+  --topbar-dim: #d9e6f4;
   --topbar-hover: rgba(255, 255, 255, 0.12);
   --topbar-active: rgba(255, 255, 255, 0.18);
   --topbar-line: rgba(255, 255, 255, 0.16);
@@ -259,7 +259,7 @@ html[data-theme="dark"] {
   --text: #d3dce6;
   --text-strong: #f0f5fa;
   --text-muted: #94a4b4;
-  --text-faint: #72828f;
+  --text-faint: #8293a0;
 
   --link: #8db6e4;
   --link-hover: #b3d2f5;
@@ -318,20 +318,20 @@ html[data-theme="ice"] {
 
   --text: #1e3a47;
   --text-strong: #0d2a36;
-  --text-muted: #5b8296;
-  --text-faint: #8aadbd;
+  --text-muted: #4f7488;
+  --text-faint: #57808f;
 
-  --link: #0e7fa8;
-  --link-hover: #095f7e;
+  --link: #0a6c90;
+  --link-hover: #074d68;
 
   --accent: #2b9fc6;
-  --accent-strong: #0e7fa8;
+  --accent-strong: #0b6d91;
   --accent-soft: #e0f4fc;
 
-  --topbar-bg: #3a9ec6;
-  --topbar-edge: #2b86ab;
+  --topbar-bg: #24748f;
+  --topbar-edge: #1b5d75;
   --topbar-text: #ffffff;
-  --topbar-dim: #d9f1fb;
+  --topbar-dim: #e2f5fd;
   --topbar-hover: rgba(255, 255, 255, 0.14);
   --topbar-active: rgba(255, 255, 255, 0.22);
   --topbar-line: rgba(255, 255, 255, 0.22);
@@ -935,6 +935,15 @@ html[data-theme="ice"] {
 .btn i,
 .btn .fa-solid { margin-right: 5px; }
 
+/* The Play icon is a plain glyph on purpose: the button must read correctly
+   even when the Font Awesome CDN is unreachable. */
+.play-glyph {
+  margin-right: 5px;
+  font-size: 9px;
+  line-height: 1;
+  vertical-align: 0;
+}
+
 .btn--block {
   display: flex;
   width: 100%;
@@ -1168,11 +1177,9 @@ html[data-theme="ice"] {
 }
 
 .address-box {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   margin-bottom: 8px;
-  padding: 8px 6px;
+  padding: 8px 8px;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-inset);
@@ -1180,14 +1187,19 @@ html[data-theme="ice"] {
   color: var(--text-strong);
   font-family: var(--font-mono);
   font-size: 12px;
-  line-height: 1.4;
-  word-break: break-all;
+  line-height: 1.5;
   text-align: center;
+}
+
+.address-box code {
+  font-size: inherit;
+  word-break: break-all;
 }
 
 .address-port {
   color: var(--accent-strong);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 #connect-panel.is-pulsing {
@@ -1368,6 +1380,22 @@ html[data-theme="ice"] {
   .rail .panel { margin-bottom: 0; }
 
   .rail .panel--about { grid-column: 1 / -1; }
+
+  .rail .panel--about .panel-body {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .rail .panel--about .about-text {
+    max-width: 420px;
+    margin-right: 18px;
+  }
+
+  .rail .panel--about .kv {
+    width: 220px;
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1427,9 +1455,9 @@ html[data-theme="ice"] {
 
   .btn-play-label { display: none; }
 
-  .btn--play { padding: 0 9px; }
+  .btn--play { padding: 0 10px; }
 
-  .btn--play i { margin-right: 0; }
+  .btn--play .play-glyph { margin-right: 0; }
 }
 
 @media (max-width: 420px) {

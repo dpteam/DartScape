@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Page not found — DartScape</title>
-  <meta name="theme-color" content="#4a76a8" id="themeColor">
+  <meta name="theme-color" content="#45688e" id="themeColor">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b2c4a'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' font-weight='bold' fill='%23e8c25a' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
   <style>
     /* ---- Theme tokens -------------------------------------------------- */
@@ -24,11 +24,11 @@
       --border-soft: #dde6f0;
       --text: #26313d;
       --strong: #16222e;
-      --muted: #6d7f92;
+      --muted: #5c6d80;
       --link: #2b587a;
-      --accent: #4a76a8;
-      --topbar: #4a76a8;
-      --topbar-edge: #3a608c;
+      --accent: #2f5b86;
+      --topbar: #45688e;
+      --topbar-edge: #35557a;
       --topbar-dim: #d3e3f3;
       --gold: #e8c25a;
       --gold-edge: #c9a43e;
@@ -70,11 +70,11 @@
       --border-soft: #d3ecf6;
       --text: #1e3a47;
       --strong: #0d2a36;
-      --muted: #5b8296;
-      --link: #0e7fa8;
-      --accent: #2b9fc6;
-      --topbar: #3a9ec6;
-      --topbar-edge: #2b86ab;
+      --muted: #4f7488;
+      --link: #0a6c90;
+      --accent: #0b6d91;
+      --topbar: #24748f;
+      --topbar-edge: #1b5d75;
       --topbar-dim: #d9f1fb;
       --gold: #f0cd6b;
       --gold-edge: #c9a848;
@@ -251,7 +251,7 @@
         if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
         document.documentElement.setAttribute('data-theme', t);
         var m = document.getElementById('themeColor');
-        var c = { light: '#4a76a8', dark: '#22374f', ice: '#3a9ec6' };
+        var c = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
         if (m && c[t]) { m.setAttribute('content', c[t]); }
       } catch (e) { /* storage disabled — light default is fine */ }
     }());
@@ -288,7 +288,7 @@
 <script>
   (function () {
     var KEY = 'dartscape.theme';
-    var COLORS = { light: '#4a76a8', dark: '#22374f', ice: '#3a9ec6' };
+    var COLORS = { light: '#45688e', dark: '#22374f', ice: '#24748f' };
     var buttons = document.querySelectorAll('[data-theme-set]');
     var i;
 
