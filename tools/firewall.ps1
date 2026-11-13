@@ -136,8 +136,11 @@ $rules = @(
        Note = $(if ($WebAny) { 'public, via the reverse proxy' } else { 'local network only (proxy is on this machine)' }) },
     @{ Name = 'DartScape Admin Panel'; Port = $adminPort; Remote = $lanRemote;
        Note = 'never forwarded by the router' },
-    @{ Name = 'DartScape Relay'; Port = $relayPort; Remote = $anyRemote;
-       Note = 'NAT hairpin workaround' }
+    # The relay only ever joins players on the same home network, so it has no
+    # reason to accept traffic from the internet. Keeping it LAN-scoped means a
+    # stray port forward cannot expose it by accident.
+    @{ Name = 'DartScape Relay'; Port = $relayPort; Remote = $lanRemote;
+       Note = 'same-network players only, never forward this' }
 )
 
 # --- helpers ---------------------------------------------------------------

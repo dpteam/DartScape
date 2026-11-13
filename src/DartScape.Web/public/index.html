@@ -24,19 +24,7 @@
   <!-- Optional icon font. Every icon here is decorative; text labels always render. -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
-  <script>
-    /* Apply the stored theme before first paint to avoid a light-theme flash. */
-    (function () {
-      try {
-        var t = window.localStorage.getItem('dartscape.theme');
-        if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
-        document.documentElement.setAttribute('data-theme', t);
-        var m = document.querySelector('meta[name="theme-color"]');
-        var c = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
-        if (m && c[t]) { m.setAttribute('content', c[t]); }
-      } catch (e) { /* private mode / disabled storage — keep the light default. */ }
-    }());
-  </script>
+  <script src="assets/js/theme-boot.js?v=1"></script>
 </head>
 <body>
 

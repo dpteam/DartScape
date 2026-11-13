@@ -110,6 +110,17 @@ namespace DartScape.Web
                 return PublicApi.Handle(_world, _config, _store, request, response, ClientIp(request));
             }
 
+            // Generated per request from the config, so it is never stale and never a
+            // 404: an unconfigured deployment gets an empty stylesheet and the stock
+            // palette rather than a console error.
+            if (string.Equals(path, "/brand.css", StringComparison.OrdinalIgnoreCase))
+            {
+                response.ContentType = "text/css; charset=utf-8";
+                response.Body = System.Text.Encoding.UTF8.GetBytes(Branding.BuildStylesheet(_config));
+                response.SetHeader("Cache-Control", "no-cache, must-revalidate");
+                return true;
+            }
+
             if (path == "/" || path.Length == 0)
             {
                 return _publicFiles.TryServe(request, response, "/index.html");

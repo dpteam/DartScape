@@ -324,6 +324,25 @@ namespace DartScape.Launcher
             string host = _settings.Host;
             int port = _settings.Port;
 
+            // A player on the same network as the server cannot reach it by the public
+            // name: the router will not loop the connection back inside. Fall back to the
+            // loopback address, which is correct when the launcher runs on the server box,
+            // and fails harmlessly (in under a second) when it does not.
+            string reachableHost;
+            int reachablePort;
+
+            if (TryResolveReachable(host, port, out reachableHost, out reachablePort))
+            {
+                if (reachableHost != host)
+                {
+                    Send("status", "Using the local server at " + reachableHost + ":" + reachablePort + ".");
+                    Log.Info("Launcher", "Public address unreachable; using {0}:{1}.", reachableHost, reachablePort);
+                }
+
+                host = reachableHost;
+                port = reachablePort;
+            }
+
             var arguments = new StringBuilder(256);
             arguments.Append("--server ").Append(Quote(host + ":" + port.ToString(CultureInfo.InvariantCulture)));
             arguments.Append(" --name ").Append(Quote(_settings.Name));
@@ -371,6 +390,56 @@ namespace DartScape.Launcher
             }
         }
 
+        /// <summary>
+        /// Finds an address that actually accepts a connection.
+        /// </summary>
+        /// <remarks>
+        /// Tries the configured address first, then loopback. The loopback attempt is what
+        /// makes the launcher work on the machine that also hosts the server: NAT hairpin
+        /// blocks the public name from inside the network, but 127.0.0.1 never leaves the
+        /// machine. When the launcher runs elsewhere the loopback attempt is refused
+        /// instantly, so the cost is negligible.
+        /// </remarks>
+        private static bool TryResolveReachable(string host, int port, out string reachableHost, out int reachablePort)
+        {
+            reachableHost = host;
+            reachablePort = port;
+
+            if (CanConnect(host, port)) return true;
+
+            if (host != "127.0.0.1" && host != "localhost" && CanConnect("127.0.0.1", port))
+            {
+                reachableHost = "127.0.0.1";
+                reachablePort = port;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Quick TCP reachability probe with a short timeout.</summary>
+        private static bool CanConnect(string host, int port)
+        {
+            if (string.IsNullOrEmpty(host) || port < 1 || port > 65535) return false;
+
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    IAsyncResult result = client.BeginConnect(host, port, null, null);
+                    if (!result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(2))) return false;
+                    if (!client.Connected) return false;
+
+                    client.EndConnect(result);
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         private void OnGameExited(object sender, EventArgs e)
         {
             try
@@ -409,23 +478,14 @@ namespace DartScape.Launcher
                 return;
             }
 
+            // Use the same fallback the Play button uses, so a LAN player never sees
+            // "unreachable" for a server that is in fact running next to them.
+            string reachableHost;
+            int reachablePort;
+            TryResolveReachable(host, port, out reachableHost, out reachablePort);
+
             var stopwatch = Stopwatch.StartNew();
-            bool ok;
-
-            try
-            {
-                using (var client = new TcpClient())
-                {
-                    IAsyncResult result = client.BeginConnect(host, port, null, null);
-                    ok = result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(3)) && client.Connected;
-                    if (ok) client.EndConnect(result);
-                }
-            }
-            catch (Exception)
-            {
-                ok = false;
-            }
-
+            bool ok = CanConnect(reachableHost, reachablePort);
             stopwatch.Stop();
 
             Send("ping", string.Format(CultureInfo.InvariantCulture,
@@ -441,10 +501,16 @@ namespace DartScape.Launcher
             // above the game port by convention.
             int webPort = port + 1;
 
+            // Same hairpin fallback as Play: on the server box, the public name is
+            // unreachable from inside the network but loopback works.
+            string reachableHost;
+            int reachableWebPort;
+            TryResolveReachable(host, webPort, out reachableHost, out reachableWebPort);
+
             string json = null;
             try
             {
-                json = FetchWorlds(host, webPort);
+                json = FetchWorlds(reachableHost, reachableWebPort);
             }
             catch (Exception ex)
             {

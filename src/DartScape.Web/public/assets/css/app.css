@@ -1090,8 +1090,6 @@ html[data-theme="ice"] {
   text-align: center;
 }
 
-.events .empty::before { display: none; }
-
 
 /* ==========================================================================
    12. News
@@ -1184,7 +1182,6 @@ html[data-theme="ice"] {
   background: var(--accent);
 }
 
-.skills .empty,
 #skills-list .empty {
   padding: 6px 0;
   color: var(--text-muted);

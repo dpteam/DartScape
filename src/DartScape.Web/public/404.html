@@ -1,27 +1,32 @@
 <!DOCTYPE html>
 <!--
   DartScape — 404 page.
-  Everything is inlined on purpose: the server answers unknown paths with this
-  file, so the browser URL can be at any depth and relative asset URLs would
-  break. Same 2008 social-network chrome as the status page, just smaller.
+
+  Everything is inlined on purpose: the server answers a missing file with this
+  document while the address bar keeps the original (possibly deep) path, so any
+  relative asset URL would resolve against the wrong directory. That also means
+  no external script and no inline script: the Content-Security-Policy only
+  allows `script-src 'self'`, so this page ships with no JavaScript at all and
+  follows the operating system's light/dark preference instead of the stored
+  site theme.
 -->
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Page not found — DartScape</title>
-  <meta name="theme-color" content="#45688e" id="themeColor">
+  <meta name="theme-color" content="#45688e">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b2c4a'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' font-weight='bold' fill='%23e8c25a' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
   <style>
-    /* ---- Theme tokens -------------------------------------------------- */
-    :root,
-    html[data-theme="light"] {
+    /* ---- Palette: light by default, dark when the OS asks for it --------- */
+    :root {
       color-scheme: light;
+
       --bg: #e9eef4;
       --panel: #ffffff;
       --head: #eef3f9;
       --border: #c3d2e3;
-      --border-soft: #dde6f0;
+      --border-strong: #a9bed6;
       --text: #26313d;
       --strong: #16222e;
       --muted: #5c6d80;
@@ -29,62 +34,41 @@
       --accent: #2f5b86;
       --topbar: #45688e;
       --topbar-edge: #35557a;
-      --topbar-dim: #d9e6f4;
+      --topbar-ink: #ffffff;
+      --topbar-shadow: rgba(0, 0, 0, 0.28);
       --gold: #e8c25a;
       --gold-edge: #c9a43e;
       --navy: #1b2c4a;
-      --topbar-ink: #ffffff;
+      --inset: #f1f5fa;
       --shadow: rgba(24, 44, 72, 0.10);
       --highlight: rgba(255, 255, 255, 0.85);
-      --inset: #f1f5fa;
     }
 
-    html[data-theme="dark"] {
-      color-scheme: dark;
-      --bg: #161c24;
-      --panel: #1f2733;
-      --head: #232d3a;
-      --border: #33414f;
-      --border-soft: #2a3542;
-      --text: #d3dce6;
-      --strong: #f0f5fa;
-      --muted: #94a4b4;
-      --link: #8db6e4;
-      --accent: #5b8fd0;
-      --topbar: #22374f;
-      --topbar-edge: #16273a;
-      --topbar-dim: #a3b9ce;
-      --gold: #e8c25a;
-      --gold-edge: #b28f38;
-      --navy: #16233a;
-      --topbar-ink: #eef5fc;
-      --shadow: rgba(0, 0, 0, 0.40);
-      --highlight: rgba(255, 255, 255, 0.05);
-      --inset: #1a222c;
-    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
 
-    html[data-theme="ice"] {
-      color-scheme: light;
-      --bg: #e6f4fa;
-      --panel: #ffffff;
-      --head: #e4f5fc;
-      --border: #b4dced;
-      --border-soft: #d3ecf6;
-      --text: #1e3a47;
-      --strong: #0d2a36;
-      --muted: #4f7488;
-      --link: #0a6c90;
-      --accent: #0b6d91;
-      --topbar: #5cbde0;
-      --topbar-edge: #3f9dc0;
-      --topbar-dim: #123a4c;
-      --gold: #f0cd6b;
-      --gold-edge: #c9a848;
-      --topbar-ink: #0d2a36;
-      --navy: #123a4c;
-      --shadow: rgba(20, 80, 110, 0.12);
-      --highlight: rgba(255, 255, 255, 0.90);
-      --inset: #eef8fd;
+        --bg: #161c24;
+        --panel: #1f2733;
+        --head: #232d3a;
+        --border: #33414f;
+        --border-strong: #435667;
+        --text: #d3dce6;
+        --strong: #f0f5fa;
+        --muted: #94a4b4;
+        --link: #8db6e4;
+        --accent: #8fb8e8;
+        --topbar: #22374f;
+        --topbar-edge: #16273a;
+        --topbar-ink: #eef5fc;
+        --topbar-shadow: rgba(0, 0, 0, 0.45);
+        --gold: #e8c25a;
+        --gold-edge: #b28f38;
+        --navy: #16233a;
+        --inset: #1a222c;
+        --shadow: rgba(0, 0, 0, 0.40);
+        --highlight: rgba(255, 255, 255, 0.05);
+      }
     }
 
     /* ---- Base ---------------------------------------------------------- */
@@ -102,6 +86,8 @@
 
     a { color: var(--link); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    a:focus-visible,
+    button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
     /* ---- Top bar ------------------------------------------------------- */
     .bar {
@@ -121,8 +107,7 @@
       font-family: Georgia, "Times New Roman", serif;
       font-size: 17px;
       font-weight: 700;
-      text-decoration: none;
-      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+      text-shadow: 0 1px 0 var(--topbar-shadow);
     }
 
     .logo:hover { text-decoration: none; }
@@ -139,28 +124,8 @@
       font-size: 17px;
       line-height: 24px;
       text-align: center;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
     }
-
-    .themes { display: flex; margin-left: auto; padding: 2px; border: 1px solid rgba(0, 0, 0, 0.18); border-radius: 4px; background: rgba(0, 0, 0, 0.10); }
-
-    .themes button {
-      width: 21px;
-      height: 20px;
-      padding: 0;
-      border: 0;
-      border-radius: 3px;
-      background: transparent;
-      color: var(--topbar-dim);
-      font: inherit;
-      font-size: 12px;
-      line-height: 20px;
-      cursor: pointer;
-    }
-
-    .themes button { display: block; }
-    .themes button svg { display: block; margin: 0 auto; width: 12px; height: 12px; }
-    .themes button:hover { background: rgba(255, 255, 255, 0.30); color: var(--topbar-ink); }
-    .themes button.is-active { background: var(--panel); color: var(--accent); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18); }
 
     /* ---- Card ---------------------------------------------------------- */
     .wrap {
@@ -206,7 +171,7 @@
       font-weight: 700;
     }
 
-    p { margin: 0 0 10px; color: var(--text); }
+    p { margin: 0 0 10px; }
 
     .lead { color: var(--muted); }
 
@@ -217,7 +182,7 @@
       height: 26px;
       margin: 0 3px;
       padding: 0 12px;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
       border-radius: 4px;
       background: var(--panel);
       box-shadow: inset 0 1px 0 var(--highlight);
@@ -226,6 +191,7 @@
       font-size: 11.5px;
       font-weight: 600;
       line-height: 24px;
+      text-decoration: none;
       cursor: pointer;
     }
 
@@ -238,9 +204,17 @@
       font-weight: 700;
     }
 
-    .btn--primary:hover { background: var(--gold); border-color: var(--navy); }
+    .btn--primary:hover { border-color: var(--navy); }
 
     .hint { margin: 0; color: var(--muted); font-size: 11px; }
+
+    .hint code {
+      padding: 1px 4px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--inset);
+      font-family: Consolas, "Lucida Console", "Courier New", monospace;
+    }
 
     .foot {
       margin: 14px 0 0;
@@ -249,34 +223,11 @@
       text-align: center;
     }
   </style>
-  <script>
-    (function () {
-      try {
-        var t = window.localStorage.getItem('dartscape.theme');
-        if (t !== 'light' && t !== 'dark' && t !== 'ice') { return; }
-        document.documentElement.setAttribute('data-theme', t);
-        var m = document.getElementById('themeColor');
-        var c = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
-        if (m && c[t]) { m.setAttribute('content', c[t]); }
-      } catch (e) { /* storage disabled — light default is fine */ }
-    }());
-  </script>
 </head>
 <body>
 
 <header class="bar">
   <a class="logo" href="./"><span class="mark" aria-hidden="true">D</span>DartScape</a>
-  <div class="themes" role="group" aria-label="Colour theme">
-    <button type="button" data-theme-set="light" title="Light theme" aria-label="Light theme">
-      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="3.1" fill="currentColor"/><g stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6"/><path d="M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1"/></g></svg>
-    </button>
-    <button type="button" data-theme-set="dark" title="Dark theme" aria-label="Dark theme">
-      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10.4 1.6a6.6 6.6 0 100 12.8 7 7 0 010-12.8z" fill="currentColor"/></svg>
-    </button>
-    <button type="button" data-theme-set="ice" title="Ice theme" aria-label="Ice theme">
-      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.4v13.2M2.3 4.7l11.4 6.6M13.7 4.7L2.3 11.3"/></g><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
-    </button>
-  </div>
 </header>
 
 <main class="wrap">
@@ -288,44 +239,12 @@
       <p class="lead">The address you asked for isn't part of the world. It may have moved, or it never existed at all.</p>
       <p class="actions">
         <a class="btn btn--primary" href="./">Back to world status</a>
-        <button type="button" class="btn" onclick="if (history.length > 1) { history.back(); } else { location.href = './'; }">Go back</button>
       </p>
-      <p class="hint">Looking for raw data? Try <a href="api/status">api/status</a>.</p>
+      <p class="hint">If you followed a link, the page behind it has moved. Status data is served from <code>api/status</code>.</p>
     </div>
   </div>
   <p class="foot">DartScape is a fan project and is not affiliated with Jagex Ltd.</p>
 </main>
 
-<script>
-  (function () {
-    var KEY = 'dartscape.theme';
-    var COLORS = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
-    var buttons = document.querySelectorAll('[data-theme-set]');
-    var i;
-
-    function current() {
-      var t = document.documentElement.getAttribute('data-theme');
-      return t === 'dark' || t === 'ice' ? t : 'light';
-    }
-
-    function apply(name) {
-      document.documentElement.setAttribute('data-theme', name);
-      var meta = document.getElementById('themeColor');
-      if (meta) { meta.setAttribute('content', COLORS[name]); }
-      for (var j = 0; j < buttons.length; j++) {
-        var on = buttons[j].getAttribute('data-theme-set') === name;
-        buttons[j].className = on ? 'is-active' : '';
-        buttons[j].setAttribute('aria-pressed', on ? 'true' : 'false');
-      }
-      try { window.localStorage.setItem(KEY, name); } catch (e) { /* ignore */ }
-    }
-
-    for (i = 0; i < buttons.length; i++) {
-      buttons[i].onclick = function () { apply(this.getAttribute('data-theme-set')); };
-    }
-
-    apply(current());
-  }());
-</script>
 </body>
 </html>

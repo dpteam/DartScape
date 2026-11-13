@@ -405,12 +405,11 @@
       ['Web port', '<span class="mono">' + esc(portText(server.webPort, 43595)) + '</span>'],
       ['Relay',
         '<span class="mono">' + esc(portText(server.relayPort, 43597)) + '</span>' +
-        ' <span class="dot ' + (relayOnline ? 'dot--ok' : 'dot--bad') + '"></span>' +
+        ' <span class="dot ' + (relayOnline ? 'dot--ok' : 'dot--warn') + '"></span>' +
         (relayOnline ? 'Online' : 'Offline')],
       ['Access', world.members ? 'Members' : 'Free to play'],
       ['Last restart', esc(server.lastRestartReason || 'unknown')]
     ];
-
     var html = '';
     for (var i = 0; i < rows.length; i++) {
       html += '<div class="kv-row">' +

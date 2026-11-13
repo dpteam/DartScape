@@ -8,10 +8,36 @@ no container runtime, no cloud service.
 
 | Port | Protocol | Service | Forward on the router? | Expose via NPM? |
 |---|---|---|---|---|
-| 43594 | TCP | Game protocol | **Yes** | No |
-| 43595 | TCP/HTTP | Public status site | Only if NPM is on another machine | **Yes** |
+| 43594 | TCP | Game protocol | **Yes — the only one** | No |
+| 43595 | TCP/HTTP | Public status site | No, when NPM is on this machine | **Yes** |
 | 43596 | TCP/HTTP | Admin panel | **Never** | Never |
-| 43597 | TCP | NAT-hairpin relay | Yes, if anyone needs it | No |
+| 43597 | TCP | NAT-hairpin relay | **No** | No |
+
+**Forward exactly one port: 43594.**
+
+43595 is reached by Nginx Proxy Manager over the local network, so it does not
+need a router rule at all. Add `-WebAny` only if NPM runs on a different machine.
+
+43596 (admin) and 43597 (relay) are local-network services by design. Forwarding
+either one exposes a surface that gains nothing from being public.
+
+### About the relay
+
+The relay solves NAT hairpin: a player on the same network as the server cannot
+reach it by the public hostname, because the router will not loop the connection
+back inside.
+
+For this deployment there is a simpler answer, and the launcher already uses it:
+**fall back to the loopback address.** If the launcher runs on the server
+machine, `127.0.0.1:43594` always works. If it runs elsewhere on the LAN, the
+public name usually works anyway (some routers do support hairpin), and the
+operator can type the LAN address into the launcher's Server field.
+
+The relay itself is built, tested and listening, but it is **not yet wired into
+the login path** — nothing registers a session and no client attaches to it. It
+exists for the future case of player-hosted worlds, where the host genuinely is
+behind an unfriendly router. Until then it does nothing, which is why its port
+stays on the local network.
 
 The admin port binds to `0.0.0.0` so that any device on the home network can
 reach it. That is deliberate, and it is the only reason it binds broadly: the
@@ -83,11 +109,18 @@ router's public address: the router will not loop the connection back inside.
 The symptom is a login that hangs even though the port is forwarded and the
 firewall is open.
 
-The relay on port 43597 exists for this. Both the client and the "outside" peer
-connect *outward* to the relay, and it joins the two streams. It copies bytes and
-knows nothing about the game, so the world stays authoritative on the server.
+The launcher handles the common case automatically: it tries the configured
+address, and if that does not answer it retries `127.0.0.1` on the same port. So
+on the machine that hosts the server, everything just works regardless of
+hairpin. On another LAN machine, put the server's LAN address (the firewall
+script prints it) into the launcher's Server field.
 
-The relay is on by default. Disable it with:
+The relay on port 43597 exists for the harder case — a host genuinely behind an
+unfriendly router or CGNAT — where both sides dial *outward* and the relay joins
+the streams. It is built and listening but **not yet wired into the login path**,
+so it does nothing today. Leave its port closed to the internet.
+
+Disable it entirely with:
 
 ```ini
 [relay]

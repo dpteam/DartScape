@@ -32,7 +32,6 @@ Drop the folder on a machine, run the exe, and you are in the world.
 | **Launcher** | MSHTML shell (works on XP), account form, server browser, three themes |
 | **Web** | Public status site with live player list, plus a LAN-only admin panel |
 | **Relay** | NAT-hairpin workaround for players behind the same router |
-
 ## Quick start
 
 ### Playing
