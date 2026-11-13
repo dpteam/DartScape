@@ -107,23 +107,36 @@ namespace DartScape.Client.Net
 
         private static void DecodePosition(ClientWorld world, PacketBuffer buffer)
         {
+            int index = buffer.ReadUnsignedShort();
             int plane = buffer.ReadUnsignedByte();
             int x = buffer.ReadUnsignedShortLE();
             int y = buffer.ReadUnsignedShortLE();
+            string name = buffer.ReadString();
+            int privilege = buffer.ReadUnsignedByte();
 
+            world.MyIndex = index;
+            world.MyPrivilege = privilege;
             world.MyPlane = plane;
             world.MyX = x;
             world.MyY = y;
 
-            ClientPlayer me = world.Me;
-            if (me != null)
+            // The local player is an entry in the same list as everyone else, so that
+            // movement and appearance decoding work identically for it.
+            ClientPlayer me = world.Players[index];
+            if (me == null)
             {
-                me.Plane = plane;
-                me.X = x;
-                me.Y = y;
-                me.LastX = x;
-                me.LastY = y;
+                me = new ClientPlayer { Index = index };
+                world.Players[index] = me;
             }
+
+            me.Name = name;
+            me.Privilege = privilege;
+            me.IsLocal = true;
+            me.Plane = plane;
+            me.X = x;
+            me.Y = y;
+            me.LastX = x;
+            me.LastY = y;
         }
 
         private static void DecodeContainer(ClientWorld world, PacketBuffer buffer)
@@ -499,6 +512,10 @@ namespace DartScape.Client.Net
             for (int i = 0; i < 12; i++) player.EquipmentIds[i] = Math.Max(0, buffer.ReadUnsignedShort() - 1);
             for (int i = 0; i < 5; i++) player.Colours[i] = buffer.ReadUnsignedByte();
             for (int i = 0; i < 7; i++) player.BodyParts[i] = buffer.ReadUnsignedShort();
+
+            // Combat level is optional: an older server does not send it, and a missing
+            // tail must not be read as zero damage or a truncated packet.
+            if (buffer.Remaining >= 2) player.CombatLevel = buffer.ReadUnsignedShort();
 
             player.AppearanceReceived = true;
         }

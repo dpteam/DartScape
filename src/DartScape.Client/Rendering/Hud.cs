@@ -261,9 +261,13 @@ namespace DartScape.Client.Rendering
 
             _text.DrawCentred(target, "DartScape", 0, height / 2 - 150, width, AccentColour, FontRenderer.Size.Title);
 
-            int panelWidth = 320;
-            int panelX = (width - panelWidth) / 2;
-            int panelY = height / 2 - 60;
+            // The panel geometry lives in LoginLayout so the mouse hit test and the
+            // renderer cannot disagree about where a field is.
+            LoginLayout layout = LoginLayout.For(width, height);
+
+            int panelWidth = layout.PanelWidth;
+            int panelX = layout.PanelX;
+            int panelY = layout.PanelY;
 
             target.BlendRect(panelX - 16, panelY - 16, panelWidth + 32, 210, Framebuffer.Argb(210, 16, 24, 36));
             target.DrawRect(panelX - 16, panelY - 16, panelWidth + 32, 210, Framebuffer.Argb(180, 200, 170, 74));
@@ -278,7 +282,7 @@ namespace DartScape.Client.Rendering
             target.DrawRect(panelX, panelY + 68, panelWidth, 24, Framebuffer.Argb(255, 90, 100, 118));
             _text.Draw(target, new string('*', (password ?? string.Empty).Length), panelX + 6, panelY + 72, TextColour);
 
-            int buttonY = panelY + 112;
+            int buttonY = layout.Button.Y;
             target.FillRect(panelX, buttonY, panelWidth, 32, busy ? Framebuffer.Rgb(60, 66, 78) : Framebuffer.Rgb(58, 92, 140));
             target.DrawRect(panelX, buttonY, panelWidth, 32, Framebuffer.Argb(255, 200, 170, 74));
             _text.DrawCentred(target, busy ? "Connecting..." : "Log in", panelX, buttonY + 8, panelWidth,
@@ -286,11 +290,77 @@ namespace DartScape.Client.Rendering
 
             if (!string.IsNullOrEmpty(status))
             {
-                _text.DrawCentred(target, status, 0, buttonY + 46, width, unchecked((int)0xFFFF9A9A), FontRenderer.Size.Small);
+                // Wrapped: a real error message is longer than one line, and clipping it
+                // turns a useful message into a useless one.
+                int statusY = layout.Button.Bottom + 14;
+
+                foreach (string line in _text.Wrap(status, width - 80, FontRenderer.Size.Small))
+                {
+                    _text.DrawCentred(target, line, 0, statusY, width, unchecked((int)0xFFFF9A9A), FontRenderer.Size.Small);
+                    statusY += 15;
+                }
             }
 
-            _text.DrawCentred(target, "Enter to log in  В·  Tab to switch field", 0, height - 40, width,
+            _text.DrawCentred(target, "Enter to log in  |  Tab to switch field  |  click a field to focus it",
+                0, height - 40, width,
                 Framebuffer.Lerp(MutedColour, Framebuffer.Rgb(12, 22, 38), 0.2), FontRenderer.Size.Small);
+        }
+    }
+
+    /// <summary>A rectangle in canvas coordinates.</summary>
+    public struct LoginRect
+    {
+        public int X;
+        public int Y;
+        public int Width;
+        public int Height;
+
+        /// <summary>Y coordinate of the first row below the rectangle.</summary>
+        public int Bottom
+        {
+            get { return Y + Height; }
+        }
+
+        public bool Contains(int x, int y)
+        {
+            return x >= X && x < X + Width && y >= Y && y < Y + Height;
+        }
+    }
+
+    /// <summary>
+    /// Geometry of the login screen.
+    /// </summary>
+    /// <remarks>
+    /// The renderer and the hit test both read this. Drawing a field in one place and
+    /// making it clickable in another is a bug you only find when a user reports "the
+    /// mouse does not work", so the two must share one definition.
+    /// </remarks>
+    public struct LoginLayout
+    {
+        public int PanelX;
+        public int PanelY;
+        public int PanelWidth;
+        public LoginRect NameField;
+        public LoginRect PasswordField;
+        public LoginRect Button;
+
+        /// <summary>Computes the layout for a canvas of the given size.</summary>
+        public static LoginLayout For(int width, int height)
+        {
+            const int panelWidth = 320;
+
+            int panelX = (width - panelWidth) / 2;
+            int panelY = height / 2 - 60;
+
+            return new LoginLayout
+            {
+                PanelX = panelX,
+                PanelY = panelY,
+                PanelWidth = panelWidth,
+                NameField = new LoginRect { X = panelX, Y = panelY + 16, Width = panelWidth, Height = 24 },
+                PasswordField = new LoginRect { X = panelX, Y = panelY + 68, Width = panelWidth, Height = 24 },
+                Button = new LoginRect { X = panelX, Y = panelY + 112, Width = panelWidth, Height = 32 }
+            };
         }
     }
 }

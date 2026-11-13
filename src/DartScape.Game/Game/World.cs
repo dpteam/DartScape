@@ -216,6 +216,11 @@ namespace DartScape.Game
             player.View.Clear();
             player.View.LastSentPosition = player.Position;
 
+            // Force the appearance block out on the first tick, so the player sees their
+            // own character and everyone else sees it too. Without this a new character
+            // is drawn with default colours until something else marks it dirty.
+            player.AppearanceDirty = true;
+
             _players[index] = player;
 
             AddEvent("login", player.Name + " logged in");

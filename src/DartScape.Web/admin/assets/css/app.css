@@ -1701,6 +1701,11 @@ body.modal-open {
     max-width: none;
   }
 
+  /* Card rows read better as one long page than inside a nested scroller. */
+  .table-wrap--scroll {
+    max-height: none;
+  }
+
   .toasts {
     right: 8px;
     bottom: 68px;

@@ -126,7 +126,11 @@ namespace DartScape.Client.Net
                     return;
                 }
 
-                _stream.ReadTimeout = 0;    // blocking reads from here on
+                // Blocking reads from here on. NetworkStream rejects 0: its setter only
+                // accepts Timeout.Infinite (-1) or a positive value, and 0 throws
+                // ArgumentOutOfRangeException, which is exactly the failure this used to
+                // produce the instant login succeeded.
+                _stream.ReadTimeout = Timeout.Infinite;
                 SetState(ConnectionState.Connected);
 
                 _reader = new Thread(ReadLoop) { IsBackground = true, Name = "DartScape.Reader" };

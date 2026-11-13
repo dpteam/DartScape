@@ -371,6 +371,10 @@ namespace DartScape.Server.Net
             ItemStack weapon = player.Equipment[3];
             buffer.WriteShort(weapon.IsEmpty ? 0 : weapon.Id + 1);
 
+            // Combat level, so other clients can render "Name (42)" without having to
+            // recompute it from a skill block they never receive for other players.
+            buffer.WriteShort(player.CombatLevel);
+
             return buffer.ToArray();
         }
 

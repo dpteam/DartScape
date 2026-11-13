@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using DartScape.Core.Diagnostics;
@@ -67,6 +67,7 @@ namespace DartScape.Tests
                 if (serverAddress != null)
                 {
                     LiveServerTests.Run(serverAddress);
+                    ClientConnectionTests.Run(serverAddress);
                 }
                 else
                 {

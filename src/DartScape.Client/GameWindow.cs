@@ -329,6 +329,45 @@ namespace DartScape.Client
             e.Handled = true;
         }
 
+        /// <summary>
+        /// Routes a click on the login screen: focus a field, or press the button.
+        /// </summary>
+        /// <remarks>
+        /// Without this the login screen was keyboard-only, which reads as "the mouse is
+        /// broken" to anyone who does not already know the Tab trick.
+        /// </remarks>
+        private void HandleLoginClick(Point canvas)
+        {
+            LoginLayout layout = LoginLayout.For(CanvasWidth, CanvasHeight);
+
+            if (layout.NameField.Contains(canvas.X, canvas.Y))
+            {
+                _passwordFocused = false;
+                return;
+            }
+
+            if (layout.PasswordField.Contains(canvas.X, canvas.Y))
+            {
+                _passwordFocused = true;
+                return;
+            }
+
+            if (layout.Button.Contains(canvas.X, canvas.Y))
+            {
+                AttemptLogin();
+            }
+        }
+
+        /// <summary>True when the pointer is over something clickable on the login screen.</summary>
+        private bool IsOverLoginControl(Point canvas)
+        {
+            LoginLayout layout = LoginLayout.For(CanvasWidth, CanvasHeight);
+
+            return layout.NameField.Contains(canvas.X, canvas.Y)
+                || layout.PasswordField.Contains(canvas.X, canvas.Y)
+                || layout.Button.Contains(canvas.X, canvas.Y);
+        }
+
         private void AttemptLogin()
         {
             if (string.IsNullOrEmpty(_nameText))
@@ -368,9 +407,13 @@ namespace DartScape.Client
 
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
-            if (_loginMode) return;
-
             Point canvas = ToCanvas(e.Location);
+
+            if (_loginMode)
+            {
+                if (e.Button == MouseButtons.Left) HandleLoginClick(canvas);
+                return;
+            }
 
             // Right-drag rotates the camera, like the original.
             if (e.Button == MouseButtons.Right)
@@ -477,9 +520,17 @@ namespace DartScape.Client
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
-            if (!_dragging) return;
-
             Point canvas = ToCanvas(e.Location);
+
+            // A hand cursor is the only affordance that says "this is clickable" on a
+            // screen with no hover states.
+            if (_loginMode)
+            {
+                Cursor = IsOverLoginControl(canvas) ? Cursors.Hand : Cursors.Default;
+                return;
+            }
+
+            if (!_dragging) return;
 
             // One tile of camera movement per 32 pixels dragged.
             _world.CameraOffsetX = _dragCameraX + (canvas.X - _dragStart.X) / WorldRenderer.TileSize;

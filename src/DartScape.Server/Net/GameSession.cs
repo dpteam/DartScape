@@ -160,12 +160,18 @@ namespace DartScape.Server.Net
             _world.SendSkills(player);
             _world.SendInventory(player);
 
-            // The client must know where it is before it can render anything.
+            // The client must know who and where it is before it can render anything.
+            // The index is part of that: without it the client cannot identify which
+            // entry in the player list is itself, so `Me` stays null and every action
+            // that needs a local player silently does nothing.
             Send(Protocol.OutPlayerPosition, buffer =>
             {
+                buffer.WriteShort(player.Index);
                 buffer.WriteByte(player.Position.Plane);
                 buffer.WriteShortLE(player.Position.X);
                 buffer.WriteShortLE(player.Position.Y);
+                buffer.WriteString(player.Name);
+                buffer.WriteByte(player.Privilege);
             });
 
             // Give the player something to look at: the local NPCs are picked up by the

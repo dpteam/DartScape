@@ -43,7 +43,7 @@
     theme: 'light',
     players: [],
     playerFilter: '',
-    logs: { since: 0, level: 'all', autoScroll: true, lines: [] },
+    logs: { since: 0, lastSeq: 0, level: 'all', autoScroll: true, lines: [] },
     config: null,
     history: [],
     historyIndex: -1,
@@ -324,7 +324,6 @@
   }
 
   function setConn(kind) {
-    state.conn = kind;
     if (!dom.connPill) { return; }
     dom.connPill.className = 'pill conn is-' + kind;
     var labels = { ok: 'Live', err: 'Error', offline: 'Offline', wait: 'Connecting', off: 'Offline' };
@@ -454,7 +453,7 @@
     state.history = [];
     state.historyIndex = -1;
     state.historyDraft = '';
-    state.logs = { since: 0, level: 'all', autoScroll: true, lines: [] };
+    state.logs = { since: 0, lastSeq: 0, level: 'all', autoScroll: true, lines: [] };
 
     storageRemove(TOKEN_KEY);
     closeModal();
@@ -1138,6 +1137,15 @@
 
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i] || {};
+
+      /* `seq` is monotonic per the contract. Skipping anything at or below
+         the high-water mark keeps a retried or overlapping response from
+         duplicating lines in the tail. */
+      if (typeof line.seq === 'number') {
+        if (line.seq <= state.logs.lastSeq) { continue; }
+        state.logs.lastSeq = line.seq;
+      }
+
       state.logs.lines.push(line);
       if (matchesLogFilter(line)) {
         frag.appendChild(makeLogRow(line));
@@ -1147,9 +1155,11 @@
 
     while (state.logs.lines.length > MAX_LOG_LINES) { state.logs.lines.shift(); }
 
-    dom.logOut.appendChild(frag);
-    while (dom.logOut.childNodes.length > MAX_LOG_LINES) {
-      dom.logOut.removeChild(dom.logOut.firstChild);
+    if (added > 0) {
+      dom.logOut.appendChild(frag);
+      while (dom.logOut.childNodes.length > MAX_LOG_LINES) {
+        dom.logOut.removeChild(dom.logOut.firstChild);
+      }
     }
 
     updateLogCount();
@@ -1232,6 +1242,8 @@
   }
 
   function clearLogs() {
+    /* Clear the view and the buffer, but keep the `since` cursor so the next
+       poll only brings genuinely new lines rather than replaying the buffer. */
     state.logs.lines = [];
     dom.logOut.innerHTML = '';
     updateLogCount();

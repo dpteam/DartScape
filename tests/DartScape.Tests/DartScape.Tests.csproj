@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -17,6 +17,7 @@
     <ProjectReference Include="..\..\src\DartScape.Core\DartScape.Core.csproj" />
     <ProjectReference Include="..\..\src\DartScape.Game\DartScape.Game.csproj" />
     <ProjectReference Include="..\..\src\DartScape.Web\DartScape.Web.csproj" />
+    <ProjectReference Include="..\..\src\DartScape.Client\DartScape.Client.csproj" />
   </ItemGroup>
 
 </Project>
