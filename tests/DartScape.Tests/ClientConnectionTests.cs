@@ -78,6 +78,41 @@ namespace DartScape.Tests
                 }
             });
 
+            Harness.Test("the client can walk and the server moves it", () =>
+            {
+                var config = new ClientConfig { Host = host, Port = port };
+                var world = new ClientWorld();
+                var client = new GameClient(config, world);
+
+                try
+                {
+                    client.Connect(host, port, "Probe" + Rng(), "probe-password");
+
+                    ConnectionState state = WaitForState(client, TimeSpan.FromSeconds(20));
+                    Harness.Equal((int)ConnectionState.Connected, (int)state,
+                        "connected (reason: " + (client.LastError ?? "none") + ")");
+
+                    Harness.True(WaitFor(() => world.Me != null, TimeSpan.FromSeconds(5)), "local player");
+
+                    int startX = world.MyX;
+                    int startY = world.MyY;
+
+                    // Ask to walk a few tiles. The server paths and moves; the client sees
+                    // the result in the update packets, which is the whole round trip.
+                    client.WalkTo(startX + 4, startY);
+
+                    bool moved = WaitFor(() => world.MyX != startX || world.MyY != startY,
+                        TimeSpan.FromSeconds(10));
+
+                    Harness.True(moved, "the player moved from " + startX + "," + startY +
+                        " (now " + world.MyX + "," + world.MyY + ")");
+                }
+                finally
+                {
+                    client.Disconnect();
+                }
+            });
+
             Harness.Test("the client survives an idle connection without dropping it", () =>
             {
                 // This is the specific regression: a zero read timeout throws the moment

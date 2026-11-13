@@ -52,6 +52,7 @@ namespace DartScape.Tests
             {
                 CoreTests.Run();
                 GameTests.Run();
+                CollisionTests.Run();
                 InfrastructureTests.Run();
 
                 if (cachePath != null)

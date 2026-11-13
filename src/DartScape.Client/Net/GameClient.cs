@@ -8,6 +8,7 @@ using DartScape.Core.Cache;
 using DartScape.Core.Crypto;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
+using DartScape.Game;
 
 
 namespace DartScape.Client.Net
@@ -54,6 +55,49 @@ namespace DartScape.Client.Net
         private IsaacRandom _outboundIsaac;
         private readonly object _writeLock = new object();
         private volatile bool _closed;
+
+        /// <summary>
+        /// The client's own collision map and pathfinder.
+        /// </summary>
+        /// <remarks>
+        /// The client paths locally so movement starts on the click, and the server paths again
+        /// on its own map so a modified client cannot walk through a wall. Both build from the
+        /// same <see cref="WorldTerrain"/>, so they agree without exchanging data.
+        /// </remarks>
+        private CollisionMap _collision;
+        private PathFinder _paths;
+        private int _collisionCentreX;
+        private int _collisionCentreY;
+
+        /// <summary>
+        /// Rebuilds the local collision window around the player.
+        /// </summary>
+        /// <remarks>
+        /// Called when the player has moved far enough that the 104x104 window no longer covers
+        /// what they can see. Until the real landscape loader exists this is generated from the
+        /// procedural terrain.
+        /// </remarks>
+        private void EnsureCollision(int x, int y)
+        {
+            if (_collision != null)
+            {
+                int dx = x - _collisionCentreX;
+                int dy = y - _collisionCentreY;
+
+                if (Math.Abs(dx) < CollisionMap.Size / 2 - 20 && Math.Abs(dy) < CollisionMap.Size / 2 - 20)
+                {
+                    return;
+                }
+            }
+
+            var map = new CollisionMap(x - CollisionMap.Size / 2, y - CollisionMap.Size / 2);
+            WorldTerrain.BuildCollision(map, x, y, CollisionMap.Size / 2);
+
+            _collision = map;
+            _paths = new PathFinder(map);
+            _collisionCentreX = x;
+            _collisionCentreY = y;
+        }
 
         public GameClient(ClientConfig config, ClientWorld world)
         {
@@ -364,39 +408,73 @@ namespace DartScape.Client.Net
             }
         }
 
-        /// <summary>Asks the server to walk to a tile.</summary>
+        /// <summary>
+        /// Sends a walk request: the path the client computed, in the original's format.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The original sends the whole path, not a destination, and the server applies one tile
+        /// per tick. That is what makes movement feel immediate: the client starts walking the
+        /// instant you click, without waiting a round trip.
+        /// </para>
+        /// <para>
+        /// The layout, which is easy to get subtly wrong:
+        /// </para>
+        /// <code>
+        ///   [opcode][len = 2n + 3][x: LEShortA][(dx,dy) pairs][y: LEShort][run: byte]
+        /// </code>
+        /// <para>
+        /// The anchor is the <em>first</em> step, closest to the player, and every delta is
+        /// relative to that anchor, not to the previous waypoint. Coordinates are world
+        /// coordinates, so the anchor carries the full position and the deltas are small signed
+        /// bytes. At most 25 waypoints fit.
+        /// </para>
+        /// </remarks>
         public void WalkTo(int worldX, int worldY)
         {
             ClientPlayer me = _world.Me;
             if (me == null) return;
 
-            // The server expects the path as a sequence of one-tile steps starting from
-            // the player's current tile.
-            var steps = new List<int>(64);
-            int x = me.X;
-            int y = me.Y;
+            // The path comes from the same algorithm the server uses, so both ends agree about
+            // which tiles are reachable.
+            var path = new List<Position>(PathFinder.MaxPathLength);
 
-            int dx = worldX - x;
-            int dy = worldY - y;
-            int count = Math.Max(Math.Abs(dx), Math.Abs(dy));
-            if (count <= 0) return;
-            if (count > 60) count = 60;
+            // Make sure the local collision window covers where the player is now.
+            EnsureCollision(me.X, me.Y);
 
-            for (int i = 0; i < count; i++)
+            Position from = new Position(me.X, me.Y, me.Plane);
+            Position to = new Position(worldX, worldY, me.Plane);
+
+            if (from == to) return;
+
+            List<Position> found = _paths != null ? _paths.Find(from, to) : null;
+            if (found != null && found.Count > 0) path.AddRange(found);
+            else path.Add(to);
+
+            if (path.Count > PathFinder.MaxPathLength)
             {
-                int stepX = Math.Sign(worldX - x);
-                int stepY = Math.Sign(worldY - y);
-                x += stepX;
-                y += stepY;
-                steps.Add(stepX);
-                steps.Add(stepY);
+                path.RemoveRange(PathFinder.MaxPathLength, path.Count - PathFinder.MaxPathLength);
             }
+
+            int anchorX = path[0].X;
+            int anchorY = path[0].Y;
+            int count = path.Count;
 
             Send(164, buffer =>
             {
-                buffer.WriteShortLE(me.X);
-                buffer.WriteShortLE(me.Y);
-                foreach (int step in steps) buffer.WriteByte(step);
+                // No explicit length byte: this protocol frames every packet as
+                // [opcode][length:2][payload], so the original's leading size byte would be a
+                // stray byte inside the payload.
+                buffer.WriteShortLEA(anchorX);
+
+                for (int i = 1; i < count; i++)
+                {
+                    buffer.WriteByte(path[i].X - anchorX);
+                    buffer.WriteByte(path[i].Y - anchorY);
+                }
+
+                buffer.WriteShortLE(anchorY);
+                buffer.WriteByteC(_world.RunEnabled ? 1 : 0);
             });
         }
 

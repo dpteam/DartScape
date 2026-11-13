@@ -70,6 +70,65 @@ namespace DartScape.Game
         /// </summary>
         public Action<World> UpdateSender;
 
+        /// <summary>
+        /// Collision for the area around the start point, and the pathfinder that uses it.
+        /// </summary>
+        /// <remarks>
+        /// Rebuilt whenever a player moves far enough that the local 104x104 window no longer
+        /// covers them. One map is enough while everyone is in the same part of the world,
+        /// which is the case for a single small world; a per-region map is the next step when
+        /// the landscape loader lands.
+        /// </remarks>
+        public CollisionMap Collision { get; private set; }
+
+        /// <summary>The pathfinder over <see cref="Collision"/>.</summary>
+        public PathFinder Paths { get; private set; }
+
+        private int _collisionCentreX;
+        private int _collisionCentreY;
+
+        /// <summary>Rebuilds the collision window around a world position.</summary>
+        public void RebuildCollision(int centreX, int centreY)
+        {
+            // The collision map is a fixed 104x104 window, so its base is the centre minus
+            // half that. Keeping the player near the middle leaves room to walk in any
+            // direction without immediately falling off the edge.
+            int baseX = centreX - CollisionMap.Size / 2;
+            int baseY = centreY - CollisionMap.Size / 2;
+
+            var map = new CollisionMap(baseX, baseY);
+            WorldTerrain.BuildCollision(map, centreX, centreY, CollisionMap.Size / 2);
+
+            Collision = map;
+            Paths = new PathFinder(map);
+            _collisionCentreX = centreX;
+            _collisionCentreY = centreY;
+
+            Log.Debug("World", "Collision rebuilt around {0},{1}.", centreX, centreY);
+        }
+
+        /// <summary>
+        /// Rebuilds collision if a player has walked far enough from its centre.
+        /// </summary>
+        private void EnsureCollisionCovers(Player player)
+        {
+            if (Collision == null)
+            {
+                RebuildCollision(player.Position.X, player.Position.Y);
+                return;
+            }
+
+            int dx = player.Position.X - _collisionCentreX;
+            int dy = player.Position.Y - _collisionCentreY;
+
+            // Rebuild once the player is within a comfortable margin of the edge, so the
+            // window always covers what they can see.
+            if (Math.Abs(dx) > CollisionMap.Size / 2 - 20 || Math.Abs(dy) > CollisionMap.Size / 2 - 20)
+            {
+                RebuildCollision(player.Position.X, player.Position.Y);
+            }
+        }
+
         public World(ServerConfig config)
         {
             if (config == null) throw new ArgumentNullException("config");
@@ -222,6 +281,10 @@ namespace DartScape.Game
             player.AppearanceDirty = true;
 
             _players[index] = player;
+
+            // Give the new player a collision window before their first tick, so the very
+            // first step they take is validated like every other.
+            EnsureCollisionCovers(player);
 
             AddEvent("login", player.Name + " logged in");
             Log.Info("World", "{0} joined at {1} ({2} online).", player.Name, player.Position, PlayerCount);
@@ -605,7 +668,7 @@ namespace DartScape.Game
                 player.Teleported = true;
                 player.DeathTicks = 0;
                 player.RestoreStats();
-                player.WalkTo(new Position(player.Position.X, player.Position.Y, player.Position.Plane));
+                player.WalkTo(new Position(player.Position.X, player.Position.Y, player.Position.Plane), Paths);
                 player.Waypoints.Clear();
                 player.CombatTargetNpc = -1;
                 player.CombatTargetPlayer = -1;
@@ -669,11 +732,25 @@ namespace DartScape.Game
         {
             if (player.Waypoints.Count == 0) return;
 
+            EnsureCollisionCovers(player);
+
             int steps = player.RunEnabled && player.RunEnergy > 0 ? 2 : 1;
 
             for (int step = 0; step < steps && player.Waypoints.Count > 0; step++)
             {
                 Position next = player.Waypoints[0];
+
+                // Every step is validated against the server's own collision map, even
+                // though the client already pathfound. The client's map is a copy; a client
+                // that lies about its path must not be able to walk through a wall, and this
+                // is the only place that can be enforced.
+                if (Collision != null && !Collision.CanStep(player.Position.X, player.Position.Y, next.X, next.Y))
+                {
+                    Log.Debug("World", "{0} tried to step into a blocked tile at {1}.", player.Name, next);
+                    player.Waypoints.Clear();
+                    break;
+                }
+
                 player.Waypoints.RemoveAt(0);
 
                 int direction = Direction.Between(player.Position, next);
@@ -713,7 +790,7 @@ namespace DartScape.Game
                 if (!player.IsAdjacentTo(target.Position))
                 {
                     // Walk towards the target rather than giving up immediately.
-                    if (player.Waypoints.Count == 0) player.WalkTo(target.Position);
+                    if (player.Waypoints.Count == 0) player.WalkTo(target.Position, Paths);
                     return;
                 }
 
@@ -731,7 +808,7 @@ namespace DartScape.Game
 
                 if (!player.IsAdjacentTo(target.Position))
                 {
-                    if (player.Waypoints.Count == 0) player.WalkTo(target.Position);
+                    if (player.Waypoints.Count == 0) player.WalkTo(target.Position, Paths);
                     return;
                 }
 

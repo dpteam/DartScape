@@ -102,39 +102,84 @@ namespace DartScape.Server.Net
 
         // -- movement ---------------------------------------------------------
 
+        /// <summary>
+        /// Handles a walk request in the original's format: a path, not a destination.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Layout: <c>[len = 2n + 3][x: LEShortA][(dx,dy) pairs][y: LEShort][run: byte]</c>.
+        /// The anchor is the first step and every delta is relative to it.
+        /// </para>
+        /// <para>
+        /// The server does not trust the path. It re-paths from its own collision map to the
+        /// final destination, so a modified client cannot walk through a wall by sending a path
+        /// that crosses one. The client's path is only used to know <em>where</em> the player
+        /// wants to go.
+        /// </para>
+        /// </remarks>
         private static void HandleWalk(World world, Player player, PacketBuffer buffer)
         {
             if (player.IsDead) return;
 
-            int startX = buffer.ReadUnsignedShortLE();
-            int startY = buffer.ReadUnsignedShortLE();
-
-            // Reject a path that does not start where the server thinks the player is:
-            // it means the client is out of sync and following it would teleport them.
-            if (Math.Abs(startX - player.Position.X) > 8 || Math.Abs(startY - player.Position.Y) > 8)
+            // Layout: [len][x: LEShortA][(dx,dy) pairs][y: LEShort][run]
+            // The trailing short is the ANCHOR's y, not the destination's: the original writes
+            // the anchor x first, the deltas in between, and the anchor y last. Total payload is
+            // 2n + 3 bytes for n waypoints.
+            if (buffer.Remaining < 5)
             {
-                Log.Debug("Packets", "{0} walk from {1},{2} but server thinks {3},{4}.",
-                    player.Name, startX, startY, player.Position.X, player.Position.Y);
+                Log.Debug("Packets", "{0} sent a truncated walk packet.", player.Name);
                 return;
             }
 
-            int steps = buffer.Remaining / 2;
-            if (steps <= 0) return;
-            if (steps > 104) steps = 104;
+            int anchorX = buffer.ReadUnsignedShortLEA();
 
-            var path = new System.Collections.Generic.List<Position>(steps);
-            int x = startX;
-            int y = startY;
-
-            for (int i = 0; i < steps; i++)
+            int pairBytes = buffer.Remaining - 3;      // minus the y short and the run byte
+            if (pairBytes < 0 || (pairBytes % 2) != 0)
             {
-                x += buffer.ReadByte();
-                y += buffer.ReadByte();
-                path.Add(new Position(x, y, player.Position.Plane));
+                Log.Debug("Packets", "{0} sent a malformed walk packet ({1} bytes).", player.Name, buffer.Remaining);
+                return;
             }
 
-            player.Waypoints.Clear();
-            player.Waypoints.AddRange(path);
+            int waypointCount = pairBytes / 2 + 1;
+            if (waypointCount < 1 || waypointCount > PathFinder.MaxPathLength)
+            {
+                Log.Debug("Packets", "{0} sent {1} waypoints; refusing.", player.Name, waypointCount);
+                return;
+            }
+
+            int lastDeltaX = 0;
+            int lastDeltaY = 0;
+
+            for (int i = 1; i < waypointCount; i++)
+            {
+                lastDeltaX = buffer.ReadByte();
+                lastDeltaY = buffer.ReadByte();
+            }
+
+            int anchorY = buffer.ReadUnsignedShortLE();
+            int run = buffer.Remaining > 0 ? buffer.ReadUnsignedByteC() : 0;
+
+            int destinationX = anchorX + lastDeltaX;
+            int destinationY = anchorY + lastDeltaY;
+
+            // A single request may not exceed the longest path the original allows. Without this
+            // a modified client can ask to walk hundreds of tiles, which is a teleport with extra
+            // steps.
+            int dx = Math.Abs(destinationX - player.Position.X);
+            int dy = Math.Abs(destinationY - player.Position.Y);
+
+            if (Math.Max(dx, dy) > PathFinder.MaxPathLength)
+            {
+                Log.Debug("Packets", "{0} asked to walk {1} tiles; clamped.", player.Name, Math.Max(dx, dy));
+                return;
+            }
+
+            player.RunEnabled = run == 1;
+
+            // The server re-paths from its own collision map. The client's path only says where
+            // the player wants to end up; it never decides how they get there.
+            player.WalkTo(new Position(destinationX, destinationY, player.Position.Plane), world.Paths);
+
             player.CombatTargetNpc = -1;
             player.CombatTargetPlayer = -1;
             player.TicksSinceAction = 0;
@@ -458,13 +503,13 @@ namespace DartScape.Server.Net
                 Player target = world.PlayerAt(index);
                 if (target != null && target.Online)
                 {
-                    player.WalkTo(target.Position);
+                    player.WalkTo(target.Position, world.Paths);
                     return;
                 }
             }
 
             Npc npc = world.NpcAt(index);
-            if (npc != null) player.WalkTo(npc.Position);
+            if (npc != null) player.WalkTo(npc.Position, world.Paths);
         }
     }
 }

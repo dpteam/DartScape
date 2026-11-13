@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DartScape.Core\DartScape.Core.csproj" />
+    <ProjectReference Include="..\DartScape.Game\DartScape.Game.csproj" />
   </ItemGroup>
 
 </Project>

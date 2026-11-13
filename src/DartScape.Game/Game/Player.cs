@@ -357,17 +357,44 @@ namespace DartScape.Game
             FaceTile = null;
         }
 
-        /// <summary>Queues a walk to <paramref name="destination"/>, replacing any existing path.</summary>
-        public void WalkTo(Position destination)
+        /// <summary>
+        /// Queues a walk to <paramref name="destination"/>, replacing any existing path.
+        /// </summary>
+        /// <remarks>
+        /// The path comes from <see cref="PathFinder"/>, not from a straight line. That is the
+        /// difference between walking around a tree and walking through it: a straight line
+        /// toward the target is fine on open ground and wrong the moment anything is in the
+        /// way, and the world has trees on almost every tile.
+        ///
+        /// When no path exists the player still walks as far as they can, which is what the
+        /// original does — clicking the far side of a wall should bring you to the wall, not
+        /// leave you standing still.
+        /// </remarks>
+        public void WalkTo(Position destination, PathFinder pathFinder = null)
         {
             Waypoints.Clear();
 
             if (destination.Plane != Position.Plane) return;
             if (destination.Equals(Position)) return;
 
-            // Straight-line stepping is enough for a 317-style world: the client only
-            // ever asks for a destination it can see, and the path is at most a few
-            // tiles. A* belongs here once object collision data is loaded.
+            if (pathFinder != null)
+            {
+                List<Position> path = pathFinder.Find(Position, destination);
+                if (path.Count > 0)
+                {
+                    Waypoints.AddRange(path);
+                    return;
+                }
+            }
+
+            // No pathfinder, or nothing reachable: fall back to stepping directly toward the
+            // target so the player is never completely stuck.
+            WalkDirect(destination);
+        }
+
+        /// <summary>Straight-line fallback used when no path can be found.</summary>
+        private void WalkDirect(Position destination)
+        {
             int dx = destination.X - Position.X;
             int dy = destination.Y - Position.Y;
 

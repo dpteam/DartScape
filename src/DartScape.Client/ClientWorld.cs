@@ -103,6 +103,9 @@ namespace DartScape.Client
         public int MyPrivilege;
         public int RunEnergy = 10000;
 
+        /// <summary>True when the player is running. Toggled by the run orb or a key.</summary>
+        public bool RunEnabled;
+
         public readonly List<ChatLine> Chat = new List<ChatLine>(100);
         public readonly List<string> ChatBuffer = new List<string>(8);
 

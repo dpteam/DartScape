@@ -195,6 +195,23 @@ namespace DartScape.Core.Protocol
             return this;
         }
 
+        /// <summary>
+        /// Little-endian short with the low byte offset by 128 (<c>putLEShortA</c>).
+        /// </summary>
+        /// <remarks>
+        /// This is the encoding the original uses for the anchor X of a walk packet, and it is
+        /// easy to confuse with <see cref="WriteShortA"/>: both offset one byte by 128, but they
+        /// put the bytes in the opposite order. Reading one as the other yields a coordinate that
+        /// is wrong by a few hundred tiles and gives no error.
+        /// </remarks>
+        public PacketBuffer WriteShortLEA(int value)
+        {
+            EnsureCapacity(2);
+            _data[_writePos++] = (byte)(value + 128);
+            _data[_writePos++] = (byte)(value >> 8);
+            return this;
+        }
+
         public PacketBuffer WriteInt(int value)
         {
             EnsureCapacity(4);
@@ -450,6 +467,15 @@ namespace DartScape.Core.Protocol
             Require(2);
             int hi = _data[_readPos++] & 0xFF;
             int lo = (_data[_readPos++] - 128) & 0xFF;
+            return (hi << 8) | lo;
+        }
+
+        /// <summary>Reads the form written by <see cref="WriteShortLEA"/>.</summary>
+        public int ReadUnsignedShortLEA()
+        {
+            Require(2);
+            int lo = (_data[_readPos++] - 128) & 0xFF;
+            int hi = _data[_readPos++] & 0xFF;
             return (hi << 8) | lo;
         }
 

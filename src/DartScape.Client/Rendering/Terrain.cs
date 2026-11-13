@@ -1,155 +1,61 @@
 ﻿using System;
-using System.Collections.Generic;
+using DartScape.Game;
 
 namespace DartScape.Client.Rendering
 {
     /// <summary>
-    /// Procedural heightfield terrain: elevation sampled at grid <em>corners</em>, so hills
-    /// slope smoothly instead of stepping tile by tile.
+    /// Terrain colours and shading for the renderer.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// This is the shape the original uses. A tile does not have one height; it has four,
-    /// one per corner, and the tile is drawn as two triangles spanning them. That is what
-    /// makes ground roll rather than look like a staircase, and it is why a hill in the
-    /// original is a smooth ramp with a visible face rather than a block.
-    /// </para>
-    /// <para>
-    /// Heights are quantised to whole units (the original uses eight per tile) so that flat
-    /// ground is genuinely flat and slopes are straight, which is what gives the terrain its
-    /// characteristic faceted look. Continuous noise underneath keeps the shapes organic.
-    /// </para>
-    /// <para>
-    /// Everything is a pure function of the corner coordinate, so the renderer, the minimap
-    /// and the click-to-walk inverse projection agree on the land without sharing data.
-    /// </para>
+    /// The shape of the world — heights, terrain classes, where the trees are — lives in
+    /// <see cref="WorldTerrain"/> in the game layer, because the server has to agree with the
+    /// client about it. This class only decides what those facts look like, which is a
+    /// rendering concern and belongs here.
     /// </remarks>
     public static class Terrain
     {
-        /// <summary>Terrain classes.</summary>
-        public const int Water = 0;
-        public const int Sand = 1;
-        public const int Grass = 2;
-        public const int Dirt = 3;
-        public const int Rock = 4;
+        public const int Water = WorldTerrain.Water;
+        public const int Sand = WorldTerrain.Sand;
+        public const int Grass = WorldTerrain.Grass;
+        public const int Dirt = WorldTerrain.Dirt;
+        public const int Rock = WorldTerrain.Rock;
 
-        /// <summary>Highest elevation a corner can have, in height units.</summary>
-        public const int MaxHeight = 12;
+        public const int MaxHeight = WorldTerrain.MaxHeight;
 
-        /// <summary>Hashes a corner coordinate to a stable value in [0, 1).</summary>
-        private static double Hash(int x, int y)
-        {
-            unchecked
-            {
-                uint h = (uint)x * 374761393u + (uint)y * 668265263u + 0x9E3779B9u;
-                h ^= h >> 13;
-                h *= 1274126177u;
-                h ^= h >> 16;
-                return (h & 0xFFFFFF) / 16777216.0;
-            }
-        }
-
-        /// <summary>Smoothly interpolated value noise on a lattice of the given scale.</summary>
-        private static double ValueNoise(double x, double y, int scale)
-        {
-            double fx = x / scale;
-            double fy = y / scale;
-
-            int x0 = (int)Math.Floor(fx);
-            int y0 = (int)Math.Floor(fy);
-
-            double tx = fx - x0;
-            double ty = fy - y0;
-
-            // Smoothstep removes the lattice grid that linear interpolation leaves visible.
-            tx = tx * tx * (3 - 2 * tx);
-            ty = ty * ty * (3 - 2 * ty);
-
-            double a = Hash(x0, y0);
-            double b = Hash(x0 + 1, y0);
-            double c = Hash(x0, y0 + 1);
-            double d = Hash(x0 + 1, y0 + 1);
-
-            double top = a + (b - a) * tx;
-            double bottom = c + (d - c) * tx;
-
-            return top + (bottom - top) * ty;
-        }
-
-        /// <summary>Fractal noise: broad shapes, medium slopes, fine detail.</summary>
-        private static double Fractal(double x, double y, int baseScale)
-        {
-            return ValueNoise(x, y, baseScale) * 0.55
-                 + ValueNoise(x, y, baseScale / 2) * 0.28
-                 + ValueNoise(x, y, Math.Max(3, baseScale / 5)) * 0.17;
-        }
-
-        /// <summary>
-        /// Elevation of a grid corner, in height units.
-        /// </summary>
-        /// <remarks>
-        /// Land is shaped so that low ground is common and high ground is rare, then
-        /// quantised. The coastline is a hard zero, which gives the sea a flat plane to sit
-        /// on and stops the water from rippling with the noise underneath it.
-        /// </remarks>
+        /// <summary>Elevation of a grid corner.</summary>
         public static int CornerHeight(int cx, int cy)
         {
-            double n = Fractal(cx, cy, 34);
-
-            // Sea level: below this the corner is flat water.
-            const double seaLevel = 0.30;
-
-            if (n < seaLevel) return 0;
-
-            double land = (n - seaLevel) / (1.0 - seaLevel);
-            land = Math.Pow(land, 1.25);
-
-            int height = (int)Math.Round(land * MaxHeight);
-
-            if (height < 1) height = 1;
-            if (height > MaxHeight) height = MaxHeight;
-
-            return height;
+            return WorldTerrain.CornerHeight(cx, cy);
         }
 
-        /// <summary>Height of the tile at (x, y), from its corner average.</summary>
+        /// <summary>Height of the tile at (x, y).</summary>
         public static int HeightAt(int x, int y)
         {
-            int h00 = CornerHeight(x, y);
-            int h10 = CornerHeight(x + 1, y);
-            int h01 = CornerHeight(x, y + 1);
-            int h11 = CornerHeight(x + 1, y + 1);
-
-            return (h00 + h10 + h01 + h11) / 4;
+            return WorldTerrain.HeightAt(x, y);
         }
 
-        /// <summary>
-        /// Terrain class for a tile.
-        /// </summary>
-        /// <remarks>
-        /// Dirt paths come from a separate noise channel, so they wander independently of
-        /// elevation and cross hills the way a real track would. The threshold is low enough
-        /// that paths are thin and rare rather than covering the map.
-        /// </remarks>
+        /// <summary>Terrain class for a tile.</summary>
         public static int TypeAt(int x, int y)
         {
-            int height = HeightAt(x, y);
-
-            if (height <= 0) return Water;
-            if (height <= 1) return Sand;
-            if (height >= 10) return Rock;
-
-            // Path channel: a different lattice so tracks do not follow the hills.
-            double path = Fractal(x * 0.7 + 913, y * 0.7 + 371, 46);
-            if (path > 0.545 && path < 0.565) return Dirt;
-
-            return Grass;
+            return WorldTerrain.TypeAt(x, y);
         }
 
         /// <summary>Elevation used for drawing.</summary>
         public static int RenderHeight(int x, int y)
         {
-            return HeightAt(x, y);
+            return WorldTerrain.HeightAt(x, y);
+        }
+
+        /// <summary>True when a tree stands on this tile.</summary>
+        public static bool HasTree(int x, int y)
+        {
+            return WorldTerrain.HasTree(x, y);
+        }
+
+        /// <summary>True when a boulder stands on this tile.</summary>
+        public static bool HasBoulder(int x, int y)
+        {
+            return WorldTerrain.HasBoulder(x, y);
         }
 
         /// <summary>
@@ -157,8 +63,8 @@ namespace DartScape.Client.Rendering
         /// </summary>
         /// <remarks>
         /// The slope term is the whole reason the terrain reads as three-dimensional: a face
-        /// turned away from the light is darker, so a hill gets a lit side and a shadowed
-        /// side even though the base colour is identical.
+        /// turned away from the light is darker, so a hill gets a lit side and a shadowed side
+        /// even though the base colour is identical.
         /// </remarks>
         public static int ColourFor(int type, int x, int y, int h00, int h10, int h01, int h11)
         {
@@ -194,19 +100,7 @@ namespace DartScape.Client.Rendering
             g = Clamp(g + (int)(jitter * 44));
             b = Clamp(b + (int)(jitter * 30));
 
-            int baseColour = Framebuffer.Rgb(r, g, b);
-
-            // Slope shading: how much this surface leans away from a light coming from the
-            // upper left. The gradient across the tile is a good enough normal for flat
-            // shading, and it is free.
-            int dx = (h10 + h11) - (h00 + h01);
-            int dy = (h01 + h11) - (h00 + h10);
-
-            double light = 0.0 - dx * 0.030 - dy * 0.045;
-            if (light > 0.22) light = 0.22;
-            if (light < -0.30) light = -0.30;
-
-            return Shade(baseColour, light);
+            return Framebuffer.Rgb(r, g, b);
         }
 
         /// <summary>Darkens (negative) or lightens (positive) a packed colour by a fraction.</summary>
@@ -242,33 +136,17 @@ namespace DartScape.Client.Rendering
             return value;
         }
 
-        /// <summary>True when a tree stands on this tile. Decorative, stable, and off the spawn.</summary>
-        public static bool HasTree(int x, int y)
+        /// <summary>Hashes a coordinate, used only for colour variation.</summary>
+        private static double Hash(int x, int y)
         {
-            int type = TypeAt(x, y);
-            if (type != Grass) return false;
-
-            if (NearSpawn(x, y)) return false;
-
-            // Denser than the flat version was: a world without trees reads as a desert.
-            return Hash(x * 31 + 7, y * 17 + 5) < 0.075;
-        }
-
-        /// <summary>True when a boulder stands on this tile.</summary>
-        public static bool HasBoulder(int x, int y)
-        {
-            if (TypeAt(x, y) != Rock) return false;
-            if (NearSpawn(x, y)) return false;
-
-            return Hash(x * 19 + 3, y * 23 + 11) < 0.08;
-        }
-
-        /// <summary>Keeps the spawn point clear so a new player is never buried in scenery.</summary>
-        private static bool NearSpawn(int x, int y)
-        {
-            int dx = x - 3222;
-            int dy = y - 3218;
-            return dx * dx + dy * dy < 36;
+            unchecked
+            {
+                uint h = (uint)x * 374761393u + (uint)y * 668265263u + 0x9E3779B9u;
+                h ^= h >> 13;
+                h *= 1274126177u;
+                h ^= h >> 16;
+                return (h & 0xFFFFFF) / 16777216.0;
+            }
         }
     }
 
@@ -284,8 +162,8 @@ namespace DartScape.Client.Rendering
     /// </para>
     /// <para>
     /// The camera rotates in quarter turns. Rotation is applied before projection, which
-    /// keeps the projection itself trivial and makes the inverse (needed for click-to-walk)
-    /// a two-line calculation.
+    /// keeps the projection itself trivial and makes the inverse (needed for click-to-walk) a
+    /// two-line calculation.
     /// </para>
     /// </remarks>
     public struct IsoProjection
@@ -293,15 +171,17 @@ namespace DartScape.Client.Rendering
         /// <summary>Half the on-screen width of a tile.</summary>
         public const int HalfWidth = 32;
 
-        /// <summary>Half the on-screen height of a tile.</summary>
+        /// <summary>Half the on-screen height of a tile's top face.</summary>
         public const int HalfHeight = 16;
 
-        /// <summary>Pixels of vertical lift per height unit.</summary>
+        /// <summary>
+        /// Pixels of vertical lift per height unit.
+        /// </summary>
         /// <remarks>
         /// This is the number that decides whether the terrain reads as hilly or flat. At 7
-        /// pixels against a 32-pixel tile, a four-unit step lifted a corner by 28 pixels —
-        /// about one tile row — which is barely perceptible. The original uses roughly a
-        /// third of a tile per height unit, and it looks right.
+        /// pixels against a 32-pixel tile a four-unit step lifted a corner by 28 pixels, about
+        /// one tile row, which was barely perceptible. Roughly a third of a tile per height
+        /// unit is what looks right.
         /// </remarks>
         public const int HeightStep = 16;
 
