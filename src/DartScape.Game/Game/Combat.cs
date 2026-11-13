@@ -1,8 +1,9 @@
-using System;
+﻿using System;
+using DartScape.Core.Protocol;
 using DartScape.Core.Diagnostics;
-using DartScape.Server.Definitions;
+using DartScape.Game.Definitions;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>
     /// Melee combat resolution, experience awards and death handling.
@@ -16,8 +17,8 @@ namespace DartScape.Server.Game
     /// <para>
     /// Only melee is implemented. Ranged and magic need projectiles and spell data that
     /// the cache revision in use does not carry, and a half-working implementation would
-    /// be worse than none. The structure — a single <c>Resolve</c> that both directions
-    /// share — is what makes adding them a contained change.
+    /// be worse than none. The structure вЂ” a single <c>Resolve</c> that both directions
+    /// share вЂ” is what makes adding them a contained change.
     /// </para>
     /// </remarks>
     public static class Combat

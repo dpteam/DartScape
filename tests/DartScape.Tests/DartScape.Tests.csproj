@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DartScape.Tests</RootNamespace>
+    <AssemblyName>DartScape.Tests</AssemblyName>
+    <Description>DartScape self-contained test runner. No test framework: it runs on .NET 4.0 and exits non-zero on failure.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DartScape.Core\DartScape.Core.csproj" />
+    <ProjectReference Include="..\..\src\DartScape.Game\DartScape.Game.csproj" />
+    <ProjectReference Include="..\..\src\DartScape.Web\DartScape.Web.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DartScape.Web</RootNamespace>
+    <AssemblyName>DartScape.Web</AssemblyName>
+    <Description>DartScape web service: public status site and LAN-only admin panel. Hosted in-process by the game server.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DartScape.Core\DartScape.Core.csproj" />
+    <ProjectReference Include="..\DartScape.Game\DartScape.Game.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="public\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="admin\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -1,13 +1,13 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
-using DartScape.Server.Definitions;
-using DartScape.Server.Game;
+using DartScape.Game.Definitions;
+using DartScape.Game;
 
-namespace DartScape.Server.Commands
+namespace DartScape.Game.Commands
 {
     /// <summary>
     /// The <c>::command</c> console.
@@ -434,7 +434,7 @@ namespace DartScape.Server.Commands
 
         private static void Save(World world, Player player, string[] args, Result result)
         {
-            var store = world.Config == null ? null : Program.Store;
+            var store = world.Config == null ? null : GameServices.Store;
             if (store == null) { result.Add("No player store available."); return; }
 
             if (args.Length > 0)
@@ -451,9 +451,9 @@ namespace DartScape.Server.Commands
 
         private static void Reload(World world, Player player, string[] args, Result result)
         {
-            if (Program.Cache == null) { result.Add("No cache loaded."); return; }
+            if (GameServices.Cache == null) { result.Add("No cache loaded."); return; }
 
-            bool ok = DefinitionLoader.Load(Program.Cache);
+            bool ok = DefinitionLoader.Load(GameServices.Cache);
             result.Add(ok
                 ? "Reloaded " + DefinitionLoader.Items.Length + " items and " + DefinitionLoader.Npcs.Length + " NPCs."
                 : "Reload failed; see the log.");
@@ -489,7 +489,7 @@ namespace DartScape.Server.Commands
             }
 
             target.Privilege = level;
-            if (Program.Store != null) Program.Store.SetPrivilege(target.NameKey, level);
+            if (GameServices.Store != null) GameServices.Store.SetPrivilege(target.NameKey, level);
 
             result.Add(target.Name + " is now privilege " + level + ".");
         }

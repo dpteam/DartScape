@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using DartScape.Core.Protocol;
-using DartScape.Server.Definitions;
-using DartScape.Server.Game;
+using DartScape.Game.Definitions;
+using DartScape.Game;
 
 namespace DartScape.Server.Net
 {

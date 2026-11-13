@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using DartScape.Server.Definitions;
+using DartScape.Game.Definitions;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>
     /// The network-facing half of a player, implemented by the connection layer.
@@ -214,7 +214,7 @@ namespace DartScape.Server.Game
 
         public bool IsDead
         {
-            get { return CurrentLevel[Skills.Hitpoints] <= 0; }
+            get { return CurrentLevel[Skills.Hitpoints] <= 0 || Hitpoints <= 0; }
         }
 
         public int CombatLevel

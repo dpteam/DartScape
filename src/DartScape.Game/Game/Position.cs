@@ -1,6 +1,6 @@
-using System;
+﻿using System;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>
     /// A point in the world: tile coordinates plus a plane (floor).
@@ -30,7 +30,7 @@ namespace DartScape.Server.Game
             return Math.Abs(X - other.X) + Math.Abs(Y - other.Y);
         }
 
-        /// <summary>Chebyshev distance — the "tiles within N" metric used for vision.</summary>
+        /// <summary>Chebyshev distance вЂ” the "tiles within N" metric used for vision.</summary>
         public int ChebyshevDistance(Position other)
         {
             if (Plane != other.Plane) return 10000;

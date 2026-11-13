@@ -53,6 +53,8 @@
     timer: null,
     inflight: false,
     errorShown: false,
+    lastPollAt: 0,
+    polls: 0,
 
     lastSeq: 0,
     playerSig: null,
@@ -507,8 +509,13 @@
       setHTML(list, '');
     }
 
+    /* An empty feed after we have rendered events means a fresh world (or a
+       restart that has not logged anything yet): drop the stale entries. */
     if (!events.length) {
-      if (!list.firstChild) {
+      if (state.lastSeq > 0) {
+        state.lastSeq = 0;
+        setHTML(list, '<li class="empty">No world events yet.</li>');
+      } else if (!list.firstChild) {
         setHTML(list, '<li class="empty">No world events yet.</li>');
       }
       return;
@@ -853,12 +860,21 @@
     state.timer = setTimeout(pollStatus, nextDelay());
   }
 
-  function pollStatus() {
+  function pollStatus(force) {
+    /* Hard floor: never issue two status requests inside POLL_MIN. */
+    var now = new Date().getTime();
+    var since = now - state.lastPollAt;
+    if (!force && state.lastPollAt && since < POLL_MIN) {
+      if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+      state.timer = setTimeout(pollStatus, POLL_MIN - since);
+      return;
+    }
     if (state.inflight) {
       schedulePoll();
       return;
     }
     state.inflight = true;
+    state.lastPollAt = now;
 
     API.get(bust('api/status'), function (err, data) {
       state.inflight = false;
@@ -876,6 +892,10 @@
         state.fails = 0;
         state.errorShown = false;
         renderStatus(data);
+
+        /* The mini news panel is cheap; refresh it every ~5 minutes. */
+        state.polls++;
+        if (state.polls % 150 === 0) { loadNews(); }
       }
 
       schedulePoll();
@@ -981,7 +1001,7 @@
     else { showView('status'); }
 
     loadNews();   /* fills the News panel on the status view */
-    pollStatus();
+    pollStatus(true);
   }
 
   /* Exposed for the admin console and for debugging. */
@@ -990,8 +1010,9 @@
     getTheme: getTheme,
     applyTheme: applyTheme,
     cycleTheme: cycleTheme,
-    refresh: pollStatus,
-    render: renderStatus
+    refresh: function () { pollStatus(true); },
+    render: renderStatus,
+    state: state
   };
 
   if (document.readyState === 'loading') {

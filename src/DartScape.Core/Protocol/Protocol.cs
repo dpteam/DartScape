@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace DartScape.Server.Net
+namespace DartScape.Core.Protocol
 {
     /// <summary>
     /// Opcodes and packet sizes for the DartScape 317-derived protocol.

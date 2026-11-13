@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using DartScape.Server.Definitions;
+using DartScape.Game.Definitions;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>A stack of one item type.</summary>
     public struct ItemStack

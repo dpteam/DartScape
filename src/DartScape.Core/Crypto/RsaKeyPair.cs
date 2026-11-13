@@ -373,7 +373,7 @@ namespace DartScape.Core.Crypto
         /// <summary>Formats an integer as a big-endian hex string.</summary>
         public static string ToHex(BigInteger value)
         {
-            byte[] big = ToBigEndian(value, (BigIntUtil.GetByteCount(value) + 7) / 8);
+            byte[] big = ToBigEndian(value, BigIntUtil.GetByteCount(value));
             var sb = new StringBuilder(big.Length * 2);
             foreach (byte b in big) sb.Append(b.ToString("x2", CultureInfo.InvariantCulture));
             return sb.ToString();

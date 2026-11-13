@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
-using DartScape.Server.Definitions;
+using DartScape.Game.Definitions;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>A non-player character: one live instance of an <see cref="NpcDefinition"/>.</summary>
     public sealed class Npc

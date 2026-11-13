@@ -1,17 +1,18 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using DartScape.Core.Configuration;
+using DartScape.Core.Protocol;
 using DartScape.Core.Diagnostics;
 
-namespace DartScape.Server
+namespace DartScape.Game
 {
     /// <summary>
     /// Typed view over <c>config.ini</c>.
     /// </summary>
     /// <remarks>
     /// Every value has a compiled-in default, so a missing or half-edited file can
-    /// never stop the server from starting — it just runs with defaults and logs what
+    /// never stop the server from starting вЂ” it just runs with defaults and logs what
     /// it did. That is the same policy the rest of the project follows: configuration
     /// is a convenience, not a dependency.
     /// </remarks>

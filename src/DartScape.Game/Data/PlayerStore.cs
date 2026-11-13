@@ -1,13 +1,13 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using DartScape.Core.Configuration;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
 using DartScape.Core.Security;
-using DartScape.Server.Game;
+using DartScape.Game;
 
-namespace DartScape.Server.Data
+namespace DartScape.Game.Data
 {
     /// <summary>
     /// Loads and saves player characters.
@@ -22,7 +22,7 @@ namespace DartScape.Server.Data
     /// </para>
     /// <para>
     /// Accounts and characters live in the same file because there is exactly one
-    /// character per account in this game — no character-select screen, no shared bank
+    /// character per account in this game вЂ” no character-select screen, no shared bank
     /// to reconcile.
     /// </para>
     /// </remarks>

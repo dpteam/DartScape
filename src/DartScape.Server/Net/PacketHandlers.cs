@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
-using DartScape.Server.Definitions;
-using DartScape.Server.Game;
+using DartScape.Game.Definitions;
+using DartScape.Game;
+using DartScape.Game.Commands;
 
 namespace DartScape.Server.Net
 {
@@ -183,7 +184,7 @@ namespace DartScape.Server.Net
             if (now - player.LastCommandMs < 500) return;
             player.LastCommandMs = now;
 
-            Commands.CommandDispatcher.Execute(world, player, text);
+            CommandDispatcher.Execute(world, player, text);
         }
 
         /// <summary>Strips control characters and truncates, without mangling unicode.</summary>

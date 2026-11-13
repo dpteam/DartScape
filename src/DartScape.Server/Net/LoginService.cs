@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -48,7 +48,7 @@ namespace DartScape.Server.Net
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The RSA step is not a security boundary — the payload is a seed and a password
+    /// The RSA step is not a security boundary вЂ” the payload is a seed and a password
     /// sent over a plain socket. What it does provide is a cheap way to reject
     /// non-DartScape clients before they can consume a player slot, and it keeps a
     /// passive observer from reading passwords off the wire on a shared network.

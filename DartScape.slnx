@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Solution>
+  <Project Path="src/DartScape.Core/DartScape.Core.csproj" />
+  <Project Path="src/DartScape.Game/DartScape.Game.csproj" />
+  <Project Path="src/DartScape.Relay/DartScape.Relay.csproj" />
+  <Project Path="src/DartScape.Web/DartScape.Web.csproj" />
+  <Project Path="src/DartScape.Server/DartScape.Server.csproj" />
+  <Project Path="src/DartScape.Client/DartScape.Client.csproj" />
+  <Project Path="src/DartScape.Launcher/DartScape.Launcher.csproj" />
+  <Project Path="tests/DartScape.Tests/DartScape.Tests.csproj" />
+</Solution>

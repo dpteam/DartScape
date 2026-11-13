@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>
     /// Per-player record of what that player's client currently knows about.

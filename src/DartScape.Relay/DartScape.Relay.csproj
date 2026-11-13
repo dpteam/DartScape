@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>DartScape.Relay</RootNamespace>
+    <AssemblyName>DartScape.Relay</AssemblyName>
+    <Description>DartScape NAT-hairpin relay: joins two outbound TCP streams so a host behind a router is reachable.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DartScape.Core\DartScape.Core.csproj" />
+  </ItemGroup>
+
+</Project>

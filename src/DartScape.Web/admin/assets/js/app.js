@@ -104,6 +104,12 @@
       ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
+  function fmtDate(unixSec) {
+    if (!unixSec) { return '—'; }
+    var d = new Date(unixSec * 1000);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
   function fmtDuration(sec) {
     if (sec === null || sec === undefined || isNaN(sec)) { return '—'; }
     sec = Math.max(0, Math.floor(Number(sec)));
@@ -600,7 +606,7 @@
     var proc = data.process || {};
 
     setText(dom.ovUptime, fmtDuration(server.uptimeSec));
-    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDateTime(proc.startedAt) : 'since —');
+    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDate(proc.startedAt) : 'since —');
     setText(dom.ovPlayers, fmtNum(world.playersOnline) + ' / ' + fmtNum(world.playersMax));
     setText(dom.ovAccountsStat, fmtNum(world.accountsTotal) + ' accounts');
     setText(dom.ovTickRate, fmtFixed(server.tickRate, 2));

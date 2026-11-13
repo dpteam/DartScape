@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,9 +10,10 @@ using DartScape.Core.Cache;
 using DartScape.Core.Crypto;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Runtime;
-using DartScape.Server.Data;
-using DartScape.Server.Definitions;
-using DartScape.Server.Game;
+using DartScape.Game.Data;
+using DartScape.Game.Definitions;
+using DartScape.Game;
+using DartScape.Game.Commands;
 using DartScape.Server.Net;
 
 namespace DartScape.Server
@@ -46,6 +47,12 @@ namespace DartScape.Server
 
         /// <summary>The effective configuration.</summary>
         public static ServerConfig Config;
+
+        /// <summary>The web service (public site + admin panel), or <c>null</c>.</summary>
+        public static Web.WebHost Web;
+
+        /// <summary>The NAT-hairpin relay, or <c>null</c>.</summary>
+        public static Relay.RelayServer Relay;
 
         private static readonly List<GameSession> Sessions = new List<GameSession>();
         private static readonly object SessionLock = new object();
@@ -124,6 +131,16 @@ namespace DartScape.Server
             World = new World(Config);
             SpawnWorldNpcs(World);
 
+            // Publish the long-lived services so the game layer and the web layer can
+            // reach them without threading three references through every constructor.
+            GameServices.Cache = Cache;
+            GameServices.Store = Store;
+            GameServices.World = World;
+            GameServices.Config = Config;
+
+            // The world must not know about packet encoding, so the encoder is injected.
+            World.UpdateSender = UpdateEncoder.SendUpdates;
+
             // --- listener ------------------------------------------------------
             IPAddress bindAddress = ResolveBindAddress(Config.Bind);
             try
@@ -141,6 +158,34 @@ namespace DartScape.Server
 
             Log.Info("Server", "Listening on {0}:{1}.", Config.Bind, Config.Port);
             Log.Info("Server", "Admin token: {0}", Config.AdminToken);
+
+            // --- web service ---------------------------------------------------
+            try
+            {
+                Web = new Web.WebHost(World, Config, Store);
+                Web.Start();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Server", "The web service could not start: {0}", ex.Message);
+                Web = null;
+            }
+
+            // --- relay ---------------------------------------------------------
+            if (Config.RelayEnabled)
+            {
+                try
+                {
+                    Relay = new Relay.RelayServer(Config.RelayPort, Config.RelayMaxTunnels, Config.RelayRateLimit);
+                    Relay.Start();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Server", "The relay could not start on port {0}: {1}", Config.RelayPort, ex.Message);
+                    Relay = null;
+                }
+            }
+
             Log.Info("Server", "Press Ctrl+C to stop.");
 
             var loginService = new LoginService(key, Config.Revision);
@@ -186,6 +231,9 @@ namespace DartScape.Server
         private static void Stop()
         {
             try { if (_listener != null) _listener.Stop(); } catch (Exception) { }
+
+            try { if (Web != null) Web.Dispose(); } catch (Exception) { }
+            try { if (Relay != null) Relay.Dispose(); } catch (Exception) { }
 
             List<GameSession> sessions;
             lock (SessionLock)
@@ -361,8 +409,8 @@ namespace DartScape.Server
                 }
 
                 // Anything else is a command run with console (full) privileges.
-                Commands.CommandDispatcher.Result result =
-                    Commands.CommandDispatcher.Execute(World, null, line);
+                CommandDispatcher.Result result =
+                    CommandDispatcher.Execute(World, null, line);
 
                 foreach (string output in result.Lines) Console.WriteLine(output);
             }

@@ -1,13 +1,13 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using DartScape.Core.Crypto;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
-using DartScape.Server.Data;
-using DartScape.Server.Definitions;
-using DartScape.Server.Game;
+using DartScape.Game.Data;
+using DartScape.Game.Definitions;
+using DartScape.Game;
 
 namespace DartScape.Server.Net
 {

@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
-using DartScape.Server.Definitions;
-using DartScape.Server.Net;
+using DartScape.Game.Definitions;
 
-namespace DartScape.Server.Game
+
+namespace DartScape.Game
 {
     /// <summary>An item stack on the ground with its owning tile.</summary>
     public sealed class WorldItem
@@ -63,6 +63,12 @@ namespace DartScape.Server.Game
 
         /// <summary>Raised when a player's state changes in a way the web layer cares about.</summary>
         public event Action PlayersChanged;
+
+        /// <summary>
+        /// Sends this tick's update packets. The networking layer installs this; the world
+        /// deliberately knows nothing about packet encoding.
+        /// </summary>
+        public Action<World> UpdateSender;
 
         public World(ServerConfig config)
         {
@@ -524,7 +530,9 @@ namespace DartScape.Server.Game
                 TickPlayers();
                 TickNpcs();
                 TickGroundItems();
-                UpdateEncoder.SendUpdates(this);
+
+                Action<World> sender = UpdateSender;
+                if (sender != null) sender(this);
             }
             catch (Exception ex)
             {
@@ -876,6 +884,10 @@ namespace DartScape.Server.Game
 
             player.Hitpoints -= damage;
             if (player.Hitpoints < 0) player.Hitpoints = 0;
+
+            // Keep the skill array in step: the client renders the hitpoints skill from
+            // CurrentLevel, and the death check reads it too.
+            player.CurrentLevel[Skills.Hitpoints] = player.Hitpoints;
 
             player.DamageToShow = damage;
             player.DamageType = type;

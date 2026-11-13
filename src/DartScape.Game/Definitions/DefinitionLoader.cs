@@ -4,7 +4,7 @@ using DartScape.Core.Cache;
 using DartScape.Core.Diagnostics;
 using DartScape.Core.Protocol;
 
-namespace DartScape.Server.Definitions
+namespace DartScape.Game.Definitions
 {
     /// <summary>An item as the game knows it: name, stackability, value, models.</summary>
     public sealed class ItemDefinition
@@ -441,20 +441,31 @@ namespace DartScape.Server.Definitions
                     case 107: buffer.Skip(1); break;
                     default:
                         Log.Debug("Defs", "NPC {0}: unknown opcode {1}, stopping early.", id, opcode);
-                        return def;
+                        return ApplyDerivedNpcStats(def);
                 }
             }
 
+            return ApplyDerivedNpcStats(def);
+        }
+
+        /// <summary>
+        /// Fills in the stats the cache does not carry.
+        /// </summary>
+        /// <remarks>
+        /// The 317 cache stores an NPC's name, size, animations and combat level, but not
+        /// hitpoints, attack or defence — those lived in the server's own spawn tables.
+        /// Deriving them from the combat level keeps every NPC fightable and is the
+        /// documented gap in <c>docs/PIPELINE.md</c>.
+        /// </remarks>
+        private static NpcDefinition ApplyDerivedNpcStats(NpcDefinition def)
+        {
             if (def.Size < 1) def.Size = 1;
 
-            // The cache stores no hitpoints, attack or defence for NPCs — those lived in
-            // the server's own spawn tables in the original game. Deriving them from the
-            // combat level keeps every NPC fightable and is the documented gap in
-            // docs/PIPELINE.md.
             if (def.Hitpoints < 1)
             {
                 def.Hitpoints = Math.Max(3, Math.Min(255, def.CombatLevel + 1));
             }
+
             if (def.Attack < 1) def.Attack = Math.Max(1, def.CombatLevel / 2 + 1);
             if (def.Defence < 1) def.Defence = Math.Max(1, def.CombatLevel / 2 + 1);
             if (def.MaxHit < 1) def.MaxHit = Math.Max(1, def.CombatLevel / 8 + 1);

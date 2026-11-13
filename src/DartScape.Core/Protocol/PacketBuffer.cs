@@ -326,30 +326,21 @@ namespace DartScape.Core.Protocol
         {
             if (count <= 0 || count > 32) throw new ProtocolException("Bit count out of range: " + count);
 
-            int bytePos = _bitPos >> 3;
-            int bitOffset = 8 - (_bitPos & 7);
+            // Simple and obviously correct: walk the bits most-significant first and set
+            // them one at a time. The packet writer is not the hot path (the tick loop
+            // writes a few hundred bits per player per tick), and a subtle bug in a
+            // word-at-a-time implementation costs far more than it saves.
             EnsureCapacity((_bitPos + count + 7) / 8 - _writePos);
 
-            for (; count > bitOffset; bitOffset = 8)
+            for (int i = count - 1; i >= 0; i--)
             {
-                _data[bytePos] &= (byte)(PacketMasks.UnsetBit[bitOffset]);
-                _data[bytePos] |= (byte)(value >> (count - bitOffset) & PacketMasks.SetBit[bitOffset]);
-                count -= bitOffset;
-                bytePos++;
-                _bitPos += bitOffset;
-            }
+                int byteIndex = _bitPos >> 3;
+                int bitIndex = 7 - (_bitPos & 7);
 
-            if (count == bitOffset)
-            {
-                _data[bytePos] &= (byte)(PacketMasks.UnsetBit[bitOffset]);
-                _data[bytePos] |= (byte)(value & PacketMasks.SetBit[bitOffset]);
-                _bitPos += bitOffset;
-            }
-            else
-            {
-                _data[bytePos] &= (byte)(PacketMasks.UnsetBit[count]);
-                _data[bytePos] |= (byte)(value & PacketMasks.SetBit[count]);
-                _bitPos += count;
+                if (((value >> i) & 1) != 0) _data[byteIndex] |= (byte)(1 << bitIndex);
+                else _data[byteIndex] &= (byte)~(1 << bitIndex);
+
+                _bitPos++;
             }
 
             if (_bitPos > _writePos * 8) _writePos = (_bitPos + 7) / 8;
@@ -587,22 +578,6 @@ namespace DartScape.Core.Protocol
         public override string ToString()
         {
             return string.Format("PacketBuffer[{0} bytes, read {1}]", _writePos, _readPos);
-        }
-    }
-
-    /// <summary>Bit masks used by the bit-level packet accessors.</summary>
-    internal static class PacketMasks
-    {
-        public static readonly int[] SetBit = new int[33];
-        public static readonly int[] UnsetBit = new int[33];
-
-        static PacketMasks()
-        {
-            for (int i = 0; i < 33; i++)
-            {
-                SetBit[i] = (1 << i) - 1;
-                UnsetBit[i] = 0xFF ^ SetBit[i];
-            }
         }
     }
 

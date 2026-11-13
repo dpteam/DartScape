@@ -1,7 +1,7 @@
-using System;
+﻿using System;
 using System.Globalization;
 
-namespace DartScape.Server.Game
+namespace DartScape.Game
 {
     /// <summary>
     /// The twenty-one skills and their experience curve.

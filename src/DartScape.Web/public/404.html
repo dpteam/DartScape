@@ -29,10 +29,11 @@
       --accent: #2f5b86;
       --topbar: #45688e;
       --topbar-edge: #35557a;
-      --topbar-dim: #d3e3f3;
+      --topbar-dim: #d9e6f4;
       --gold: #e8c25a;
       --gold-edge: #c9a43e;
       --navy: #1b2c4a;
+      --topbar-ink: #ffffff;
       --shadow: rgba(24, 44, 72, 0.10);
       --highlight: rgba(255, 255, 255, 0.85);
       --inset: #f1f5fa;
@@ -56,6 +57,7 @@
       --gold: #e8c25a;
       --gold-edge: #b28f38;
       --navy: #16233a;
+      --topbar-ink: #eef5fc;
       --shadow: rgba(0, 0, 0, 0.40);
       --highlight: rgba(255, 255, 255, 0.05);
       --inset: #1a222c;
@@ -73,11 +75,12 @@
       --muted: #4f7488;
       --link: #0a6c90;
       --accent: #0b6d91;
-      --topbar: #24748f;
-      --topbar-edge: #1b5d75;
-      --topbar-dim: #d9f1fb;
+      --topbar: #5cbde0;
+      --topbar-edge: #3f9dc0;
+      --topbar-dim: #123a4c;
       --gold: #f0cd6b;
       --gold-edge: #c9a848;
+      --topbar-ink: #0d2a36;
       --navy: #123a4c;
       --shadow: rgba(20, 80, 110, 0.12);
       --highlight: rgba(255, 255, 255, 0.90);
@@ -114,7 +117,7 @@
     .logo {
       display: flex;
       align-items: center;
-      color: #fff;
+      color: var(--topbar-ink);
       font-family: Georgia, "Times New Roman", serif;
       font-size: 17px;
       font-weight: 700;
@@ -138,7 +141,7 @@
       text-align: center;
     }
 
-    .themes { display: flex; margin-left: auto; padding: 2px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 4px; background: rgba(0, 0, 0, 0.10); }
+    .themes { display: flex; margin-left: auto; padding: 2px; border: 1px solid rgba(0, 0, 0, 0.18); border-radius: 4px; background: rgba(0, 0, 0, 0.10); }
 
     .themes button {
       width: 21px;
@@ -154,8 +157,10 @@
       cursor: pointer;
     }
 
-    .themes button:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
-    .themes button.is-active { background: #fff; color: var(--topbar); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18); }
+    .themes button { display: block; }
+    .themes button svg { display: block; margin: 0 auto; width: 12px; height: 12px; }
+    .themes button:hover { background: rgba(255, 255, 255, 0.30); color: var(--topbar-ink); }
+    .themes button.is-active { background: var(--panel); color: var(--accent); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18); }
 
     /* ---- Card ---------------------------------------------------------- */
     .wrap {
@@ -262,9 +267,15 @@
 <header class="bar">
   <a class="logo" href="./"><span class="mark" aria-hidden="true">D</span>DartScape</a>
   <div class="themes" role="group" aria-label="Colour theme">
-    <button type="button" data-theme-set="light" title="Light theme" aria-label="Light theme">&#9788;</button>
-    <button type="button" data-theme-set="dark" title="Dark theme" aria-label="Dark theme">&#9790;</button>
-    <button type="button" data-theme-set="ice" title="Ice theme" aria-label="Ice theme">&#10052;</button>
+    <button type="button" data-theme-set="light" title="Light theme" aria-label="Light theme">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="3.1" fill="currentColor"/><g stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6"/><path d="M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1"/></g></svg>
+    </button>
+    <button type="button" data-theme-set="dark" title="Dark theme" aria-label="Dark theme">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M10.4 1.6a6.6 6.6 0 100 12.8 7 7 0 010-12.8z" fill="currentColor"/></svg>
+    </button>
+    <button type="button" data-theme-set="ice" title="Ice theme" aria-label="Ice theme">
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.4v13.2M2.3 4.7l11.4 6.6M13.7 4.7L2.3 11.3"/></g><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
+    </button>
   </div>
 </header>
 
