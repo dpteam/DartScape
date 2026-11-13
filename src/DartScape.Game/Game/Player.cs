@@ -177,6 +177,34 @@ namespace DartScape.Game
         public int PoisonTicks;
         public int SkullTicks;
         public int CombatTargetNpc = -1;
+
+        /// <summary>
+        /// An action to run once the player is next to its target.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the original's <c>crossX/crossY/crossType/crossIndex</c> idea, reduced to the
+        /// one case that matters here: clicking something out of reach walks you to it and then
+        /// does what you asked. Without it a click on a distant tree or NPC does nothing, and
+        /// the player has to click again on arrival — which is not how the game behaves.
+        /// </para>
+        /// <para>
+        /// The action is cancelled by any new click, because the last click always wins.
+        /// </para>
+        /// </remarks>
+        public PendingAction Pending;
+
+        /// <summary>True while a queued action is waiting for the player to arrive.</summary>
+        public bool HasPending
+        {
+            get { return Pending.Kind != PendingActionKind.None; }
+        }
+
+        /// <summary>Forgets any queued action.</summary>
+        public void ClearPending()
+        {
+            Pending = new PendingAction();
+        }
         public int CombatTargetPlayer = -1;
         public int AttackDelay;
         public int LastDamageTaken;

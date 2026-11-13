@@ -117,6 +117,52 @@ namespace DartScape.Game
             RebuildCollision(_config.StartX, _config.StartY);
         }
 
+        /// <summary>
+        /// True when an entity can stand on a tile: the map has a floor there and nothing is
+        /// blocking it.
+        /// </summary>
+        /// <remarks>
+        /// Used when placing NPCs, and by anything else that needs to pick a tile rather than
+        /// receive one. Collision is checked against a window centred on the position itself,
+        /// because the caller is asking about somewhere the local window may not reach yet.
+        /// </remarks>
+        public bool CanStand(Position position)
+        {
+            if (Map != null)
+            {
+                TileInfo tile = Map.GetTile(position.X, position.Y);
+
+                // No region loaded there: do not put anything in the void.
+                if (!tile.Exists) return false;
+                if (tile.Water) return false;
+            }
+
+            CollisionMap map = Collision;
+
+            if (map == null || !map.Covers(position.X, position.Y))
+            {
+                map = new CollisionMap(position.X - CollisionMap.Size / 2, position.Y - CollisionMap.Size / 2);
+
+                if (Map != null) Map.BuildCollision(map, position.X, position.Y, CollisionMap.Size / 2);
+                else WorldTerrain.BuildCollision(map, position.X, position.Y, CollisionMap.Size / 2);
+            }
+
+            return map.IsWalkable(position.X, position.Y);
+        }
+
+        /// <summary>The NPC occupying a tile, or <c>null</c>.</summary>
+        public Npc NpcAt(Position position)
+        {
+            for (int i = 1; i < _npcs.Length; i++)
+            {
+                Npc npc = _npcs[i];
+                if (npc == null || npc.IsDead) continue;
+                if (npc.Position.Equals(position)) return npc;
+            }
+
+            return null;
+        }
+
         /// <summary>Rebuilds the collision window around a world position.</summary>
         public void RebuildCollision(int centreX, int centreY)
         {
@@ -673,6 +719,12 @@ namespace DartScape.Game
                 TickMovement(player);
                 TickCombat(player);
 
+                // A queued action may be waiting for a walk to finish, but it can also be
+                // waiting for nothing at all — the target died, or the player was already in
+                // range. Checking it every tick, not only while walking, is what lets it be
+                // dropped instead of sitting there for ever.
+                TryPendingAction(player);
+
                 // Level-up dialogue is queued by AddExperience.
                 if (player.PendingLevelUps.Count > 0)
                 {
@@ -819,6 +871,63 @@ namespace DartScape.Game
             if (player.MovedThisTick) player.LastActivityUtc = DateTime.UtcNow;
 
             ContinueWalk(player);
+        }
+
+        /// <summary>
+        /// Runs a queued action once the player is close enough to perform it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the other half of "walk there, then act". The walk is only started when the
+        /// player is out of range; this is what actually does the thing on arrival.
+        /// </para>
+        /// <para>
+        /// The action is dropped rather than retried when its target has gone — an NPC that
+        /// died or a ground item someone else picked up — because retrying for ever would leave
+        /// the player standing still with an invisible instruction.
+        /// </para>
+        /// </remarks>
+        private void TryPendingAction(Player player)
+        {
+            if (!player.HasPending) return;
+
+            PendingAction pending = player.Pending;
+
+            if (pending.Kind == PendingActionKind.Npc)
+            {
+                Npc npc = NpcAt(pending.NpcIndex);
+
+                if (npc == null || npc.IsDead)
+                {
+                    player.ClearPending();
+                    return;
+                }
+
+                if (!NpcActions.IsInReach(player, npc)) return;
+
+                player.ClearPending();
+                player.StopWalking();
+
+                NpcActions.Run(this, player, npc, pending.Option);
+                return;
+            }
+
+            if (pending.Kind == PendingActionKind.GroundItem)
+            {
+                if (!player.Position.Equals(pending.Target))
+                {
+                    // Unreachable: stop trying rather than standing there for ever.
+                    if (player.Waypoints.Count == 0 && !player.HasWalkDestination)
+                    {
+                        player.ClearPending();
+                    }
+
+                    return;
+                }
+
+                player.ClearPending();
+                PickupGroundItem(player, pending.Target, pending.ItemId);
+            }
         }
 
         /// <summary>

@@ -528,12 +528,34 @@ namespace DartScape.Client
             int tileX, tileY;
             projection.ScreenToTile(canvas.X, canvas.Y, out tileX, out tileY);
 
-            // Prefer an entity at the clicked tile over a plain walk.
-            ClientNpc npc = _world.NpcAt(tileX, tileY, _world.MyPlane);
-            if (npc != null)
+            // Entities first, by the pixels they actually occupy. Unprojecting the click to a
+            // tile puts the cursor on the tile *behind* an entity drawn on a slope, because a
+            // sprite stands up from its tile.
+            object entity = _world.EntityAt(canvas.X, canvas.Y);
+
+            if (entity is ClientNpc)
             {
-                _client.SendNpcAction(npc.Index, 1);
+                ClientNpc npc = (ClientNpc)entity;
+                _world.EnsureNpcActions(npc);
+
+                // Clicking an NPC runs its first option, which is what the game does. That is
+                // "Talk-to" for a man and "Attack" for a guard — sending "attack" unconditionally
+                // is what produced "You can't attack that" on every farmer.
+                int option = npc.FirstActionIndex;
+
+                _client.SendNpcAction(npc.Index, option < 0 ? 0 : option);
                 return;
+            }
+
+            if (entity is ClientPlayer)
+            {
+                ClientPlayer other = (ClientPlayer)entity;
+
+                if (!other.IsLocal)
+                {
+                    _client.SendPlayerAction(other.Index, 0);
+                    return;
+                }
             }
 
             ClientGroundItem ground = _world.GroundItemAt(tileX, tileY, _world.MyPlane);

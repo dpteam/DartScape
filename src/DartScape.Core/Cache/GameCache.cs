@@ -46,6 +46,7 @@ namespace DartScape.Core.Cache
         /// <summary>Object definitions, empty when unavailable.</summary>
         public ObjectDefinitionSet Objects { get; private set; }
 
+
         /// <summary>True when the world map is available.</summary>
         public bool HasMap
         {
@@ -118,6 +119,7 @@ namespace DartScape.Core.Cache
                 {
                     Objects = ObjectDefinitionSet.Parse(locIndex, locData);
                 }
+
             }
 
             Log.Info("Cache", "Map regions: {0}, floors: {1}, objects: {2}.",
@@ -137,6 +139,18 @@ namespace DartScape.Core.Cache
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// The underlying file store, for loaders that need raw access.
+        /// </summary>
+        /// <remarks>
+        /// Exposed so the game layer's definition loader can read the config archives itself
+        /// rather than this class duplicating every format it parses.
+        /// </remarks>
+        public FileStore Store
+        {
+            get { return _store; }
         }
 
         /// <summary>

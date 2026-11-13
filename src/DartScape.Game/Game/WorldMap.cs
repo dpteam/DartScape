@@ -77,10 +77,21 @@ namespace DartScape.Game
             _cache = cache;
         }
 
-        /// <summary>Floor definitions, for colouring the ground.</summary>
+        /// <summary>
+        /// Floor definitions, for colouring the ground.
+        /// </summary>
         public FloorDefinitionSet Floors
         {
             get { return _cache.Floors; }
+        }
+
+        /// <summary>
+        /// The underlying file store, so the game layer's definition loader can read the
+        /// config archives directly.
+        /// </summary>
+        public FileStore Store
+        {
+            get { return _cache.Store; }
         }
 
         /// <summary>Object definitions, for sizes and names.</summary>

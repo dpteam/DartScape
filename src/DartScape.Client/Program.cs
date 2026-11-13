@@ -134,6 +134,12 @@ namespace DartScape.Client
                 }
 
                 Rendering.Terrain.Map = map;
+                ClientWorld.Definitions = map;
+
+                // The client needs the same NPC and item definitions the server uses, because
+                // it is the client that decides which menu option a click means. Loading them
+                // from its own copy of the cache keeps the two in step without a protocol.
+                DartScape.Game.Definitions.DefinitionLoader.Load(map.Store);
 
                 Log.Info("Client", "Loaded {0} map regions from {1}.", map.RegionCount, directory);
             }
@@ -155,16 +161,34 @@ namespace DartScape.Client
         {
             try
             {
+                int startX = 3222;
+                int startY = 3218;
+
+                string at = Environment.GetEnvironmentVariable("DARTSCAPE_AT");
+                if (!string.IsNullOrEmpty(at))
+                {
+                    int comma = at.IndexOf(',');
+                    int ax, ay;
+
+                    if (comma > 0
+                        && int.TryParse(at.Substring(0, comma), out ax)
+                        && int.TryParse(at.Substring(comma + 1), out ay))
+                    {
+                        startX = ax;
+                        startY = ay;
+                    }
+                }
+
                 var world = new ClientWorld();
                 var me = new ClientPlayer
                 {
                     Index = 1,
                     Name = "DartPower",
                     IsLocal = true,
-                    X = 3222,
-                    Y = 3218,
-                    LastX = 3222,
-                    LastY = 3218,
+                    X = startX,
+                    Y = startY,
+                    LastX = startX,
+                    LastY = startY,
                     CombatLevel = 42,
                     Hitpoints = 34,
                     MaxHitpoints = 43,
@@ -179,7 +203,7 @@ namespace DartScape.Client
 
                 world.Players[1] = me;
                 world.MyIndex = 1;
-                world.ForceLocalPosition(3222, 3218, 0);
+                world.ForceLocalPosition(startX, startY, 0);
 
                 // A few NPCs at plausible offsets so the sorting and occlusion are exercised.
                 int[] offsets = { 3, -2, -4, 5, 2, 6, -3, 4 };
@@ -188,15 +212,32 @@ namespace DartScape.Client
 
                 for (int i = 0; i < offsets.Length; i++)
                 {
+                    int nx = startX + offsets[i];
+                    int ny = startY + offsets[(i + 3) % offsets.Length];
+
+                    // The screenshot is a fixture, not a live world, but it still has to obey
+                    // the same rule: nothing stands in the river. A demo frame with people
+                    // walking on water is a bug report waiting to happen.
+                    if (!Rendering.Terrain.IsWater(nx, ny) && !Rendering.Terrain.IsWater(nx + 1, ny))
+                    {
+                        // Keep it.
+                    }
+                    else
+                    {
+                        nx = startX + offsets[i];
+                        ny = startY - offsets[i];
+                        if (Rendering.Terrain.IsWater(nx, ny)) continue;
+                    }
+
                     var npc = new ClientNpc
                     {
                         Index = 100 + i,
                         Name = names[i],
                         CombatLevel = levels[i],
-                        X = 3222 + offsets[i],
-                        Y = 3218 + offsets[(i + 3) % offsets.Length],
-                        LastX = 3222 + offsets[i],
-                        LastY = 3218 + offsets[(i + 3) % offsets.Length],
+                        X = nx,
+                        Y = ny,
+                        LastX = nx,
+                        LastY = ny,
                         Hitpoints = 10,
                         MaxHitpoints = 10
                     };
@@ -206,7 +247,7 @@ namespace DartScape.Client
 
                 world.GroundItems.Add(new ClientGroundItem
                 {
-                    ItemId = 995, Amount = 12, X = 3220, Y = 3220, Plane = 0
+                    ItemId = 995, Amount = 12, X = startX - 2, Y = startY + 2, Plane = 0
                 });
 
                 for (int i = 0; i < 21; i++)
@@ -301,6 +342,26 @@ namespace DartScape.Client
 
                     case "--height":
                         if (value != null) { int h; if (int.TryParse(value, out h)) config.Height = Math.Max(480, h); i++; }
+                        break;
+
+                    case "--at":
+                        // Renders the screenshot at a specific tile instead of the spawn point.
+                        // The only way to inspect an arbitrary part of the world without walking
+                        // there, which matters when the bug is a cliff three regions away.
+                        if (value != null)
+                        {
+                            int comma = value.IndexOf(',');
+                            int ax, ay;
+
+                            if (comma > 0
+                                && int.TryParse(value.Substring(0, comma), out ax)
+                                && int.TryParse(value.Substring(comma + 1), out ay))
+                            {
+                                Environment.SetEnvironmentVariable("DARTSCAPE_AT", ax + "," + ay);
+                            }
+
+                            i++;
+                        }
                         break;
 
                     case "--smoke":

@@ -80,6 +80,13 @@ namespace DartScape.Server.Net
                     HandleFollow(world, player, buffer);
                     break;
 
+                case Protocol.InPlayerAction:
+                case Protocol.InPlayerAction2:
+                case Protocol.InPlayerAction3:
+                case Protocol.InPlayerAction4:
+                    HandlePlayerAction(world, player, opcode, buffer);
+                    break;
+
                 case Protocol.InItemOnItem:
                     HandleItemOnItem(world, player, buffer);
                     break;
@@ -387,7 +394,26 @@ namespace DartScape.Server.Net
             int y = buffer.ReadUnsignedShortA();
             int x = buffer.ReadUnsignedShortA();
 
-            world.PickupGroundItem(player, new Position(x, y, player.Position.Plane), itemId);
+            Position target = new Position(x, y, player.Position.Plane);
+
+            // Picking something up means standing on its tile, so a click from a distance has
+            // to walk first. Queueing the pickup rather than refusing it is what makes a single
+            // click work, which is how the game behaves.
+            if (!player.Position.Equals(target))
+            {
+                player.ClearPending();
+                player.Pending = new PendingAction
+                {
+                    Kind = PendingActionKind.GroundItem,
+                    ItemId = itemId,
+                    Target = target
+                };
+
+                player.WalkTo(target, world.Paths);
+                return;
+            }
+
+            world.PickupGroundItem(player, target, itemId);
         }
 
         private static void HandleItemOnItem(World world, Player player, PacketBuffer buffer)
@@ -464,38 +490,41 @@ namespace DartScape.Server.Net
             if (npc == null || npc.IsDead) return;
             if (!player.Position.IsWithin(npc.Position, 12)) return;
 
-            switch (opcode)
+            // The wire opcodes are not in option order, and they are not one-based either.
+            // Mapping them to the cache's zero-based action array is the whole job here.
+            int option = opcode == Protocol.InNpcAction ? 0
+                : opcode == Protocol.InNpcAction2 ? 1
+                : opcode == Protocol.InNpcAction3 ? 2
+                : 3;
+
+            string action = npc.Definition != null && npc.Definition.Actions != null
+                            && option < npc.Definition.Actions.Length
+                ? npc.Definition.Actions[option]
+                : null;
+
+            // Nothing queued survives a new click: the newest instruction wins.
+            player.ClearPending();
+            player.CombatTargetPlayer = -1;
+
+            // Out of reach: walk there first, and remember what to do on arrival. The original
+            // does this from the client; doing it on the server means a modified client cannot
+            // skip the walk.
+            if (!NpcActions.IsInReach(player, npc))
             {
-                case Protocol.InNpcAction:
-                    // Option 1 is "Attack" for anything with a combat level.
-                    if (npc.Definition != null && npc.Definition.CombatLevel > 0)
-                    {
-                        player.CombatTargetNpc = npc.Index;
-                        player.CombatTargetPlayer = -1;
-                        player.FaceTile = npc.Position;
-                    }
-                    else
-                    {
-                        world.SendMessage(player, "You can't attack that.");
-                    }
-                    break;
+                player.Pending = new PendingAction
+                {
+                    Kind = PendingActionKind.Npc,
+                    NpcIndex = npc.Index,
+                    Option = option,
+                    Target = npc.Position
+                };
 
-                case Protocol.InNpcAction2:
-                    world.SendMessage(player, npc.Name + ": " + DescribeNpc(npc));
-                    break;
-
-                case Protocol.InNpcAction3:
-                case Protocol.InNpcAction4:
-                    world.SendMessage(player, "Nothing interesting happens.");
-                    break;
+                player.WalkTo(npc.Position, world.Paths);
+                player.CombatTargetNpc = -1;
+                return;
             }
-        }
 
-        private static string DescribeNpc(Npc npc)
-        {
-            if (npc.Definition == null) return "It looks confused.";
-            if (!string.IsNullOrEmpty(npc.Definition.Description)) return npc.Definition.Description;
-            return "It's a " + npc.Name + ".";
+            NpcActions.Run(world, player, npc, option);
         }
 
         private static void HandleObjectAction(World world, Player player, PacketBuffer buffer)
@@ -510,6 +539,28 @@ namespace DartScape.Server.Net
             // not expose in a form the server reads yet. Acknowledge instead of ignoring
             // so the client does not sit waiting.
             world.SendMessage(player, "Nothing interesting happens.");
+        }
+
+        /// <summary>
+        /// Handles a click on another player.
+        /// </summary>
+        /// <remarks>
+        /// There are no player options in the cache, so option zero is always "Attack". The
+        /// same walk-then-act rule applies as for NPCs: a click from out of range walks you in
+        /// and then starts the fight.
+        /// </remarks>
+        private static void HandlePlayerAction(World world, Player player, int opcode, PacketBuffer buffer)
+        {
+            int index = buffer.ReadUnsignedShort();
+            Player other = world.PlayerAt(index);
+
+            if (other == null || other == player || other.IsDead) return;
+            if (!player.Position.IsWithin(other.Position, 12)) return;
+
+            player.ClearPending();
+            player.CombatTargetNpc = -1;
+            player.CombatTargetPlayer = index;
+            player.FaceTile = other.Position;
         }
 
         private static void HandleFollow(World world, Player player, PacketBuffer buffer)

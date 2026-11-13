@@ -50,6 +50,34 @@ namespace DartScape.Client
         public string Name = "";
         public int CombatLevel;
         public int Size = 1;
+
+        /// <summary>
+        /// Menu options from the cache, in the order the game shows them.
+        /// </summary>
+        /// <remarks>
+        /// Filled in from the local copy of <c>npc.dat</c> the first time the NPC is drawn, so
+        /// a click can send the option the player actually means. Without it the client has to
+        /// guess, and the guess is always "attack" — which is why clicking a farmer produced
+        /// "You can't attack that" instead of a conversation.
+        /// </remarks>
+        public string[] Actions;
+
+        /// <summary>The first option that exists, or -1.</summary>
+        public int FirstActionIndex
+        {
+            get
+            {
+                if (Actions == null) return -1;
+
+                for (int i = 0; i < Actions.Length; i++)
+                {
+                    if (!string.IsNullOrEmpty(Actions[i])) return i;
+                }
+
+                return -1;
+            }
+        }
+
         public int X;
         public int Y;
         public int Plane;
@@ -99,6 +127,40 @@ namespace DartScape.Client
 
         public readonly ClientPlayer[] Players = new ClientPlayer[MaxPlayers];
         public readonly ClientNpc[] Npcs = new ClientNpc[MaxNpcs];
+
+        /// <summary>
+        /// The cache the client loaded, for definitions the server does not send.
+        /// </summary>
+        /// <remarks>
+        /// The map is loaded before login and lives here so the renderer, the pathfinder and
+        /// the menu all read the same copy. It is <c>null</c> when the client runs without a
+        /// cache, in which case NPCs simply have no menu options beyond "attack if hostile".
+        /// </remarks>
+        public static DartScape.Game.WorldMap Definitions;
+
+        /// <summary>
+        /// Fills in an NPC's menu options from the cache, if they are not known yet.
+        /// </summary>
+        /// <remarks>
+        /// Done lazily rather than when the NPC arrives, because most NPCs on screen are never
+        /// clicked. The definition set is already open for the map, so this is a plain array
+        /// index.
+        /// </remarks>
+        public void EnsureNpcActions(ClientNpc npc)
+        {
+            if (npc == null || npc.Actions != null) return;
+
+            DartScape.Game.Definitions.NpcDefinition definition =
+                DartScape.Game.Definitions.DefinitionLoader.Npc(npc.DefinitionId);
+
+            if (definition == null) return;
+
+            npc.Actions = definition.Actions;
+
+            // The server's name wins when it has one, because it is authoritative about what it
+            // actually spawned; the cache fills the gap when it does not.
+            if (string.IsNullOrEmpty(npc.Name) && definition.Name != null) npc.Name = definition.Name;
+        }
         public readonly List<ClientGroundItem> GroundItems = new List<ClientGroundItem>();
 
         public readonly int[] Experience = new int[21];
@@ -547,6 +609,65 @@ namespace DartScape.Client
                 if (x >= npc.X && x < npc.X + npc.Size && y >= npc.Y && y < npc.Y + npc.Size) return npc;
             }
             return null;
+        }
+
+        /// <summary>
+        /// The entity whose drawn sprite covers a screen point, or <c>null</c>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Clicking an entity cannot be done by unprojecting the pixel to a tile. An entity is
+        /// drawn as a sprite standing <em>up</em> from its tile, so on a slope the sprite's head
+        /// is many pixels above the tile it belongs to — clicking a guard on a hill lands on the
+        /// tile behind him and the click walks instead of attacking.
+        /// </para>
+        /// <para>
+        /// The renderer records the rectangle each entity occupied, and this tests the click
+        /// against those rectangles in reverse draw order, so the topmost thing under the cursor
+        /// wins. That is the same ordering the original's menu uses.
+        /// </para>
+        /// </remarks>
+        public object EntityAt(int screenX, int screenY)
+        {
+            if (_hits == null) return null;
+
+            for (int i = _hits.Count - 1; i >= 0; i--)
+            {
+                EntityHit hit = _hits[i];
+
+                if (screenX < hit.X || screenX >= hit.X + hit.Width) continue;
+                if (screenY < hit.Y || screenY >= hit.Y + hit.Height) continue;
+
+                if (hit.Npc != null && Npcs[hit.Npc.Index] == hit.Npc) return hit.Npc;
+                if (hit.Player != null && Players[hit.Player.Index] == hit.Player) return hit.Player;
+            }
+
+            return null;
+        }
+
+        /// <summary>One entity's screen rectangle, recorded while drawing.</summary>
+        public struct EntityHit
+        {
+            public ClientNpc Npc;
+            public ClientPlayer Player;
+            public int X;
+            public int Y;
+            public int Width;
+            public int Height;
+        }
+
+        private readonly List<EntityHit> _hits = new List<EntityHit>(64);
+
+        /// <summary>Clears the recorded rectangles. Called once per frame, before drawing.</summary>
+        public void BeginHitTest()
+        {
+            _hits.Clear();
+        }
+
+        /// <summary>Records where an entity was drawn.</summary>
+        public void AddHit(EntityHit hit)
+        {
+            _hits.Add(hit);
         }
 
         /// <summary>Finds a player at a tile.</summary>

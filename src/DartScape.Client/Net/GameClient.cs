@@ -554,9 +554,30 @@ namespace DartScape.Client.Net
         }
 
         /// <summary>Sends an NPC interaction.</summary>
+        /// <summary>Sends a player menu option.</summary>
+        /// <param name="option">Zero-based option index.</param>
+        public void SendPlayerAction(int index, int option)
+        {
+            int opcode = option <= 0 ? 128 : option == 1 ? 153 : option == 2 ? 14 : 39;
+
+            Send(opcode, buffer => buffer.WriteShort(index));
+        }
+
+        /// <summary>
+        /// Sends an NPC menu option.
+        /// </summary>
+        /// <param name="option">
+        /// Zero-based option index, matching the cache's action array. -1 means "the NPC has no
+        /// options", which the server reports back rather than acting on.
+        /// </param>
         public void SendNpcAction(int index, int option)
         {
-            int opcode = option == 1 ? 155 : option == 2 ? 17 : option == 3 ? 21 : 18;
+            // The wire has four distinct opcodes for the first four options, and they are not
+            // in index order: option 0 is 155, option 1 is 17, option 2 is 21, option 3 is 18.
+            // Option 4 has no opcode in this protocol, so it is clamped to the last one rather
+            // than silently dropped.
+            int opcode = option <= 0 ? 155 : option == 1 ? 17 : option == 2 ? 21 : 18;
+
             Send(opcode, buffer => buffer.WriteShort(index));
         }
 

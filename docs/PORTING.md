@@ -31,6 +31,7 @@ The port follows `Rs317.Library.Client`, because it is the faithful one.
 | Local movement | The client moves itself and interpolates; the server validates and reconciles. |
 | Landscape data | Ported. Regions, terrain, objects and floor definitions read from the cache. |
 | Colour palette | Ported. The original's HSL table with its gamma, which is what makes it look right. |
+| Interaction | Ported. Click hits the drawn sprite; out-of-range clicks walk then act. |
 
 ---
 
@@ -317,30 +318,67 @@ Collision is applied by the object's config type, because that is what decides t
 
 ## 5. Interaction sequencing
 
-The client must remember what was clicked and re-issue the action on arrival.
-The original holds `crossX`/`crossY`/`crossType`/`crossIndex` (the little marker)
-and, for ground items, does a plain walk first and an adjacency walk if that fails.
+Ported. Clicking something out of reach now walks you there and then does what you
+asked, which is the behaviour the original gets from `crossX`/`crossY`/`crossType`/
+`crossIndex`. The state lives on the server (`Player.Pending`) rather than the client,
+so a modified client cannot skip the walk.
 
-Menu action ids, for reference:
+### 5.1 The click, end to end
 
-| Action | id |
+1. The renderer records the screen rectangle of every entity it draws.
+2. A click is tested against those rectangles in **reverse draw order**, so the
+   topmost thing under the cursor wins.
+3. If it hit an NPC, the client looks up that NPC's options and sends its **first**
+   available one.
+4. The server maps the opcode back to an option index, checks reach, and either runs
+   it or queues it and walks.
+5. On arrival, the tick runs the queued action.
+
+### 5.2 Why the click is not tile-based
+
+Unprojecting a pixel to a tile puts the cursor on the tile *behind* an entity drawn on
+a slope. An entity is a sprite standing up from its tile, so its head is many pixels
+above the tile it belongs to. Testing the click against the drawn rectangle is the
+only thing that makes clicking a guard on a hill attack him instead of walking past
+him.
+
+### 5.3 Why the option index is not "attack"
+
+Clicking an NPC runs its **first** option, and what that is depends on the definition:
+
+| NPC | Options |
 |---|---|
-| Walk here | 516 |
-| Object option 1..5 | 502, 900, 113, 872, 1062 |
-| Ground item 1..5 | 652, 567, 234, 244, 213 |
-| NPC option 1..5 | 20, 412, 225, 965, 478 |
-| Player option 1..5 | 561, 779, 27, 577, 729 |
-| Use item on object / ground / NPC / player | 62 / 511 / 582 / 491 |
+| Man | Talk-to, Attack, Pickpocket |
+| Guard | *(empty)*, Attack, Pickpocket |
+| Cow | *(empty)*, Attack |
 
-`if (menuAction >= 2000) menuAction -= 2000;` вЂ” the `+2000` marker means "attack a
-higher-level target". Missing it puts every option index off by one.
+Index 0 is "Talk-to" for a man and empty for a guard. Assuming index 0 means attack is
+what made clicking a farmer answer *"You can't attack that."* Dispatch is therefore by
+the option's **name**, looked up in the cache, not by its position.
+
+### 5.4 Opcodes
+
+The four NPC options are not in index order on the wire, and they are not one-based:
+
+| Option | Opcode |
+|---|---|
+| 0 | 155 |
+| 1 | 17 |
+| 2 | 21 |
+| 3 | 18 |
+
+Players use 128, 153, 14, 39 for the same four positions.
+
+---
 
 ## 6. Menu priority
 
-Which action a click produces depends on what is under the cursor at that exact
-pixel, ordered by distance from the cursor, with NPCs beating ground items beating
-objects beating walk. The current implementation checks tile membership, which is
-why clicking the corner of a diagonal NPC walks instead of attacking.
+Still missing as a general system. The current rule is "entity under the cursor beats
+ground item beats walk", which is right for the common case, but the original also
+orders overlapping entities by distance from the cursor and by combat level. That
+matters when three things are stacked on one tile.
+
+---
 
 ## 7. Run
 
@@ -351,12 +389,15 @@ enough, and the client's own prediction does not run at two tiles per tick yet �
 running currently makes the client one step behind per tick rather than visibly
 faster.
 
+---
+
 ## 8. Path continuation
 
 The server remembers the requested destination (`Player.WalkDestination`) and
 re-paths when the 25-tile queue empties, so a long click actually arrives instead of
 stopping a tile short. The client still caps at 25 and stops, which is correct for
 the original but means a click further than 25 tiles needs a second click.
+
 
 ## What was wrong before this port
 
@@ -376,3 +417,7 @@ Kept here because the same mistakes are easy to repeat.
 | Objects with negative ids at the region corner | Object blocks use `getSmart`, not the model-delta `getSmartB` |
 | Everything white in a saved PNG | Palette returned `0x00RRGGBB`; a zero alpha byte renders as white |
 | World flat and muddy | Cache colours are HSL indices, not RGB; the gamma of 0.8 is what lifts them |
+| "You can't attack that" on a farmer | Click sent option 0 as "attack"; a man's option 0 is "Talk-to" |
+| Clicking an NPC on a slope walked past him | Click was unprojected to a tile; a sprite stands up from its tile |
+| NPCs standing in the river | Spawn picked random offsets without checking the terrain |
+| Grey slabs in the water | Walls were drawn without asking whether their tile is water |

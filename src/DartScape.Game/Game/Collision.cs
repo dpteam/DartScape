@@ -146,6 +146,14 @@ namespace DartScape.Game
         }
 
         /// <summary>
+        /// True when a world tile falls inside this map's window.
+        /// </summary>
+        public bool Covers(int worldX, int worldY)
+        {
+            return IndexOf(worldX, worldY) >= 0;
+        }
+
+        /// <summary>
         /// True when a tile can be stood on at all, ignoring edge walls.
         /// </summary>
         /// <remarks>

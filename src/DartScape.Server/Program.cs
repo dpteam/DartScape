@@ -465,19 +465,25 @@ namespace DartScape.Server
             }
 
             int spawned = 0;
+            int attempts = 0;
             var random = new Random(1337);
 
-            for (int i = 0; i < 60; i++)
+            // Spawn on ground that can actually be stood on. Dropping NPCs at random offsets
+            // from the spawn point puts them in the river, in walls and inside houses, which
+            // then shows up as people walking on water.
+            while (spawned < 60 && attempts++ < 2000)
             {
                 int definitionId = chosen[random.Next(chosen.Count)];
 
-                int x = world.Config.StartX + random.Next(-12, 13);
-                int y = world.Config.StartY + random.Next(-12, 13);
+                int x = world.Config.StartX + random.Next(-16, 17);
+                int y = world.Config.StartY + random.Next(-16, 17);
 
-                if (world.SpawnNpc(definitionId, new Position(x, y, world.Config.StartPlane)) != null)
-                {
-                    spawned++;
-                }
+                Position where = new Position(x, y, world.Config.StartPlane);
+
+                if (!world.CanStand(where)) continue;
+                if (world.NpcAt(where) != null) continue;
+
+                if (world.SpawnNpc(definitionId, where) != null) spawned++;
             }
 
             Log.Info("Server", "Spawned {0} NPCs from {1} distinct definitions.", spawned, chosen.Count);

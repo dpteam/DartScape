@@ -133,6 +133,42 @@ namespace DartScape.Client.Rendering
             return WorldTerrain.TypeAt(x, y);
         }
 
+        /// <summary>
+        /// Colour of a vertical cliff face, derived from the floor it is cut through.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A cliff is not just the floor colour darkened. Mud floors are already a dark olive,
+        /// and darkening them further produces a black wall that reads as a hole rather than as
+        /// exposed earth. Blending part-way towards a rock tone first, then shading, is what
+        /// makes a bank look like a bank.
+        /// </para>
+        /// <para>
+        /// The blend is deliberately partial: a cliff cut through grass should still be
+        /// recognisably grass at the top, shading to earth below.
+        /// </para>
+        /// </remarks>
+        public static int CliffColour(int floorColour, double shade)
+        {
+            const int rock = 0x6E665C;
+
+            int r = (floorColour >> 16) & 0xFF;
+            int g = (floorColour >> 8) & 0xFF;
+            int b = floorColour & 0xFF;
+
+            int rr = (rock >> 16) & 0xFF;
+            int rg = (rock >> 8) & 0xFF;
+            int rb = rock & 0xFF;
+
+            // 45% towards rock: enough to read as soil and stone, not enough to erase the
+            // surface the cliff is cut through.
+            r = (r * 55 + rr * 45) / 100;
+            g = (g * 55 + rg * 45) / 100;
+            b = (b * 55 + rb * 45) / 100;
+
+            return Shade(Framebuffer.Rgb(r, g, b), shade);
+        }
+
         /// <summary>True when the tile is water.</summary>
         public static bool IsWater(int x, int y)
         {

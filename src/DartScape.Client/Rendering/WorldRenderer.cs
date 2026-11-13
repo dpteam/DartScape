@@ -35,6 +35,9 @@ namespace DartScape.Client.Rendering
         {
             if (target == null || world == null) return;
 
+            // The hit rectangles describe this frame, so they are reset before drawing.
+            world.BeginHitTest();
+
             target.SetClip(viewX, viewY, viewWidth, viewHeight);
 
             // Sky. Only visible above the horizon where no terrain covers it.
@@ -232,7 +235,7 @@ namespace DartScape.Client.Rendering
                 switch (prop.Kind)
                 {
                     case PropKind.Wall:
-                        DrawWall(target, prop.Rotation, x00, y00, x10, y10, x01, y01, x11, y11);
+                        DrawWall(target, prop, tileX, tileY, x00, y00, x10, y10, x01, y01, x11, y11);
                         break;
 
                     case PropKind.Tree:
@@ -266,6 +269,22 @@ namespace DartScape.Client.Rendering
 
                 if (entity.Player != null) DrawPlayer(target, entity.Player, ex, ey);
                 else DrawNpc(target, entity.Npc, ex, ey);
+
+                // Record where it landed, so a click can hit the sprite rather than the tile
+                // under it. The sprite stands up from the tile, so on a slope its head is many
+                // pixels above the tile it belongs to and a tile-based test misses.
+                const int spriteWidth = 22;
+                const int spriteHeight = 52;
+
+                world.AddHit(new ClientWorld.EntityHit
+                {
+                    Npc = entity.Npc,
+                    Player = entity.Player,
+                    X = ex - spriteWidth / 2,
+                    Y = ey - spriteHeight,
+                    Width = spriteWidth,
+                    Height = spriteHeight + 6
+                });
             }
         }
 
@@ -287,42 +306,54 @@ namespace DartScape.Client.Rendering
             int tileX, int tileY, double avx, double avy,
             int x00, int y00, int x10, int y10, int x01, int y01, int x11, int y11)
         {
+            // Water has no cliffs of its own. The sea bed is not drawn, so a drop between two
+            // water tiles is invisible — but a drop *out* of water would be a wall of blue,
+            // which is exactly the underwater canyon that used to appear in every river.
+            if (Terrain.IsWater(tileX, tileY)) return;
+
+            int floorColour = Terrain.ColourAt(tileX, tileY);
+
             // West edge (x-1), south edge (y-1), east edge (x+1), north edge (y+1).
-            DrawCliffFace(target, projection, avx, avy,
-                tileX - 1, tileY, 0, 0, 0, 1, x00, y00, x01, y01, -0.34);
+            DrawCliffFace(target, projection, avx, avy, floorColour,
+                tileX - 1, tileY, 0, 0, 0, 1, x00, y00, x01, y01, -0.20);
 
-            DrawCliffFace(target, projection, avx, avy,
-                tileX, tileY - 1, 0, 0, 1, 0, x00, y00, x10, y10, -0.46);
+            DrawCliffFace(target, projection, avx, avy, floorColour,
+                tileX, tileY - 1, 0, 0, 1, 0, x00, y00, x10, y10, -0.30);
 
-            DrawCliffFace(target, projection, avx, avy,
-                tileX + 1, tileY, 1, 0, 1, 1, x10, y10, x11, y11, -0.28);
+            DrawCliffFace(target, projection, avx, avy, floorColour,
+                tileX + 1, tileY, 1, 0, 1, 1, x10, y10, x11, y11, -0.16);
 
-            DrawCliffFace(target, projection, avx, avy,
-                tileX, tileY + 1, 0, 1, 1, 1, x01, y01, x11, y11, -0.40);
+            DrawCliffFace(target, projection, avx, avy, floorColour,
+                tileX, tileY + 1, 0, 1, 1, 1, x01, y01, x11, y11, -0.26);
         }
 
         /// <summary>
         /// Draws one cliff face, if the neighbour really is lower.
         /// </summary>
+        /// <param name="floorColour">Colour of the floor the cliff is cut through.</param>
         /// <param name="offsetAX">View offset of the face's first corner from the tile origin.</param>
         private void DrawCliffFace(Framebuffer target, IsoProjection projection, double avx, double avy,
+            int floorColour,
             int neighbourX, int neighbourY,
             int offsetAX, int offsetAY, int offsetBX, int offsetBY,
             int ax, int ay, int bx, int by, double shade)
         {
             double neighbourHeight = Terrain.CornerHeight(neighbourX, neighbourY);
 
-            int topAX = ay, topBX = by;
             int bottomAY = projection.ScreenY(avx + offsetAX, avy + offsetAY, neighbourHeight);
             int bottomBY = projection.ScreenY(avx + offsetBX, avy + offsetBY, neighbourHeight);
 
             // Nothing to draw when the neighbour is level with us or higher: its own face
             // handles the drop, and drawing here would double-shade the seam.
-            if (bottomAY <= topAX && bottomBY <= topBX) return;
+            if (bottomAY <= ay && bottomBY <= by) return;
 
-            int colour = Terrain.Shade(Terrain.ColourAt(neighbourX, neighbourY), shade);
+            int colour = Terrain.CliffColour(floorColour, shade);
 
-            target.FillQuad(ax, topAX, bx, topBX, bx, bottomBY, ax, bottomAY, colour);
+            target.FillQuad(ax, ay, bx, by, bx, bottomBY, ax, bottomAY, colour);
+
+            // A darker line along the bottom edge separates the cliff from whatever is below
+            // it. Without it two cliffs meeting at the same height merge into one shape.
+            DrawLine(target, ax, bottomAY, bx, bottomBY, Terrain.Shade(colour, -0.30));
         }
 
         /// <summary>
@@ -341,12 +372,19 @@ namespace DartScape.Client.Rendering
         /// flat light fill with no edge is indistinguishable from a hole in the screen.
         /// </para>
         /// </remarks>
-        private void DrawWall(Framebuffer target, int rotation,
+        private void DrawWall(Framebuffer target, PropInfo prop, int tileX, int tileY,
             int x00, int y00, int x10, int y10, int x01, int y01, int x11, int y11)
         {
+            // A wall standing in water is not a wall: it is a fence along a bank whose tile
+            // happens to be water, or a bridge pier. Drawing it as masonry puts a grey slab in
+            // the middle of the river, which is far worse than omitting it.
+            if (Terrain.IsWater(tileX, tileY)) return;
+
+            int rotation = prop.Rotation;
+
             // Wall height in pixels. Low on purpose: without object models a tall slab reads as
             // a floating panel rather than masonry, and it hides the floor behind it.
-            const int wallPixels = 14;
+            const int wallPixels = 18;
 
             int ax, ay, bx, by;
 
@@ -361,22 +399,28 @@ namespace DartScape.Client.Rendering
             // Face lighting: the two edges facing the viewer are lit, the far ones are not.
             // The contrast between adjacent faces is what makes a corner read as a corner.
             int face = rotation & 3;
-            double shade = face == 1 ? 0.0 : face == 3 ? -0.20 : -0.09;
+            double shade = face == 1 ? 0.02 : face == 3 ? -0.18 : -0.08;
 
             int colour = Terrain.Shade(0x7E7466, shade);
-            int cap = Terrain.Shade(colour, 0.08);
+            int cap = Terrain.Shade(colour, 0.14);
+            int dark = Terrain.Shade(colour, -0.30);
 
+            // Face.
             target.FillQuad(ax, ay, bx, by, bx, by - wallPixels, ax, ay - wallPixels, colour);
 
-            // A slightly lighter cap along the top and a dark line at the base give the slab
-            // thickness and ground it. The cap has to stay close to the face colour: a bright
-            // one turns the whole wall into a white bar and the face disappears underneath it.
-            DrawLine(target, ax, ay - wallPixels, bx, by - wallPixels, cap);
-            DrawLine(target, ax, ay, bx, by, Terrain.Shade(colour, -0.34));
+            // Top face, inset by a couple of pixels so the wall reads as having thickness. A
+            // wall drawn as a single flat quad looks like a beam no matter how it is coloured.
+            const int thickness = 3;
+            int capColour = cap;
 
-            // The vertical seams at each end stop two wall segments reading as one long slab.
-            DrawLine(target, ax, ay, ax, ay - wallPixels, Terrain.Shade(colour, -0.26));
-            DrawLine(target, bx, by, bx, by - wallPixels, Terrain.Shade(colour, -0.26));
+            target.FillQuad(ax, ay - wallPixels, bx, by - wallPixels,
+                bx, by - wallPixels - thickness, ax, ay - wallPixels - thickness, capColour);
+
+            // Base and end seams. The base grounds the wall; the seams stop two segments
+            // reading as one long slab.
+            DrawLine(target, ax, ay, bx, by, dark);
+            DrawLine(target, ax, ay, ax, ay - wallPixels, dark);
+            DrawLine(target, bx, by, bx, by - wallPixels, dark);
         }
 
         /// <summary>
