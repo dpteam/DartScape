@@ -1,4 +1,4 @@
-# Porting from the reference sources
+﻿# Porting from the reference sources
 
 The movement and interaction layer is being rebuilt from the reference sources in
 `refs/` rather than invented. This document records what was taken, what the exact
@@ -29,7 +29,8 @@ The port follows `Rs317.Library.Client`, because it is the faithful one.
 | Walk packet | Ported: path from the client, `LEShortA` anchor, signed-byte deltas, run byte. |
 | Server validation | Every step re-checked against the server's own map. |
 | Local movement | The client moves itself and interpolates; the server validates and reconciles. |
-| Terrain → collision | Procedural stand-in until the landscape loader exists. |
+| Landscape data | Ported. Regions, terrain, objects and floor definitions read from the cache. |
+| Colour palette | Ported. The original's HSL table with its gamma, which is what makes it look right. |
 
 ---
 
@@ -76,7 +77,7 @@ Each of these alone is enough to make movement look like it is lagging.
 | A long path was truncated at the near end | A silent gap between the player and the first waypoint, i.e. a teleport |
 
 The last one is worth spelling out because the tests only caught it by asserting
-that **every consecutive pair of waypoints is exactly one tile apart** — the gap was
+that **every consecutive pair of waypoints is exactly one tile apart** вЂ” the gap was
 at the *start* of the path, where a "does it reach the destination" test never
 looks.
 
@@ -84,7 +85,7 @@ looks.
 
 Anything that subtracts two timestamps uses `TimeUtil.MonotonicMs()`, not
 `Environment.TickCount`. The latter is 32-bit and wraps every 24.8 days; a wrap
-during a subtraction produces a delta of about −2³¹ ms, which freezes or teleports
+during a subtraction produces a delta of about в€’2ВіВ№ ms, which freezes or teleports
 every interpolated entity at once.
 
 ---
@@ -109,7 +110,7 @@ backwards, and it cost a debugging session.
 | `0x20000` | impenetrable (blocks projectiles) |
 | `0x80000` | reserved, present in every mask, never set |
 | `0x200000` | whole tile blocked |
-| `0x1000000` | **void — no floor** |
+| `0x1000000` | **void вЂ” no floor** |
 
 Two facts that are easy to miss:
 
@@ -168,7 +169,7 @@ The value stored at a tile is the direction that leads **back to its parent**:
 | 12 | `0x0C` | `(-1, -1)` |
 
 A step **east** therefore stores **8**, because the way back is west. Getting this
-inverted produces a path that zig-zags into a wall — the symptom looks like a
+inverted produces a path that zig-zags into a wall вЂ” the symptom looks like a
 broken collision map, which is why the test asserts that every consecutive pair of
 waypoints is exactly one tile apart.
 
@@ -181,7 +182,7 @@ fail.
 
 ### Fallback
 
-When the target is unreachable and the caller allows it, the search scans the 3×3
+When the target is unreachable and the caller allows it, the search scans the 3Г—3
 block around the target for the visited tile with the smallest distance, and paths
 there. That is what makes clicking the far side of a wall walk you up to the wall.
 
@@ -199,7 +200,7 @@ there. That is what makes clicking the far side of a wall walk you up to the wal
 * Every delta is relative to **the anchor**, not to the previous waypoint.
 * The trailing short is the **anchor's** y, not the destination's. This is
   genuinely strange and it is what the original does.
-* `LEShortA` is `(byte)(v + 128), (byte)(v >> 8)` — little-endian with the *low*
+* `LEShortA` is `(byte)(v + 128), (byte)(v >> 8)` вЂ” little-endian with the *low*
   byte offset. `ShortA` is the same offset with the bytes the other way round.
   Confusing them yields a coordinate a few hundred tiles off, with no error.
 * At most **25** waypoints; the rest is dropped and the client re-paths on the next
@@ -210,7 +211,7 @@ there. That is what makes clicking the far side of a wall walk you up to the wal
 
 The framing is `[opcode][length:2][payload]` with the opcode XORed against ISAAC,
 instead of the original's `[opcode][length:1][payload]`. That means the original's
-leading size byte is **not** written — the length already lives in the frame. This
+leading size byte is **not** written вЂ” the length already lives in the frame. This
 is documented in `docs/ARCHITECTURE.md`.
 
 ### What the server does with it
@@ -221,30 +222,100 @@ client that sends a path through a wall gets walked around it.
 
 ---
 
-## 4. Still to port
+## 4. Landscape data
 
-### 4.1 Landscape data (the big one)
+**Source:** `Region.cs` (`loadTerrainBlock`, `loadTerrainTile`, `loadObjectBlock`),
+`Flo.java`, `ObjectDef.java`, and the `map_index` table.
 
-Collision is currently generated from the procedural terrain. The real thing comes
-from the cache's landscape archive:
+This is now ported. The world the player walks on is the real one from the cache, not
+the procedural heightfield that stood in for it. Both the client and the server load
+it, each from its own copy of the cache, so they agree about where the walls are
+without exchanging any map data.
 
-* A **map region file** is 64×64 tiles, stored as 8×8 chunks of 8×8.
-* The client's **scene** is 104×104, i.e. 13×13 chunks, so it spans up to 3×3
-  region files.
-* `baseX = (regionX - 6) * 8`, `baseY = (regionY - 6) * 8` — equivalently
-  `playerWorldX - 48`, because the player is always at scene tile 48,48.
-* Region packet **73**: `[x: LEShortA][y: LEShort]`, no length byte.
-* Region packet **241**: generated region, 13×13×4 bits of 26-bit tile hashes.
-* Client replies with opcode **121** once the region is built.
+### 4.1 Where things live
 
-Terrain block format, per tile: a loop of setting bytes — `0` ends, `1` = explicit
-height, `2..49` = overlay floor, `50..81` = render rule flags, `82..255` = underlay
-floor.
+The cache's layout is not obvious and differs from what the reference sources imply,
+so it is worth writing down:
 
-Until this lands, the world has no real geometry: only the procedural heightfield
-the renderer invents and the collision built from it.
+| Data | Where |
+|---|---|
+| Landscape (terrain + objects) | store **4**, one slot per region file |
+| `map_index` (region to slots) | store 0, inside a named archive |
+| `flo.dat` (floor colours) | store 0, same archive |
+| `loc.dat` + `loc.idx` (objects) | store 0, same archive |
 
-### 4.2 Interaction sequencing
+The reference server reads landscape from store 3. That is wrong for this cache: store
+3 holds MIDI, and every landscape slot there is empty. Probing by slot rather than
+trusting the store number is what found it.
+
+### 4.2 The numbers
+
+* A region file is **64x64** tiles, four planes.
+* The client's scene is **104x104**, so it spans up to 3x3 region files.
+* `baseX = (regionX - 6) * 8` вЂ” equivalently `playerWorldX - 48`, because the player
+  always stands at scene tile 48,48.
+* World tile `x` is in region `x >> 6`; the region's corner is `regionX * 64`.
+
+### 4.3 Terrain block
+
+Per tile, a loop of setting bytes terminated by zero:
+
+| Byte | Meaning |
+|---|---|
+| `0` | end; height comes from the noise function (plane 0) or is 30 above the plane below |
+| `1` | end; next byte is the explicit height (`1` means 0) |
+| `2..49` | overlay floor: id follows, the low bits carry path and rotation |
+| `50..81` | render rule flags, `value - 49` |
+| `82..255` | underlay floor, `value - 81` |
+
+Heights are stored negated and multiplied by eight in the original (`-elevation * 8`)
+because its projection wants an offset. The conversion happens once, at load, so
+nothing downstream has to remember to flip it.
+
+### 4.4 Object block
+
+Two nested delta streams: one for the object id, one for the position. A zero in either
+ends the current level. Both use `getSmart` (one byte below 128, otherwise a big-endian
+short minus `0x8000`) вЂ” **not** the model-delta variant, which is offset by 64 and
+`0xC000` and walks the ids into negative numbers if used here.
+
+Collision is applied by the object's config type, because that is what decides the rule:
+
+| Type | Rule |
+|---|---|
+| 0, 1, 2, 3 | wall: blocks one edge (or two, for type 2) |
+| 4..8 | wall decoration: no collision |
+| 22 | ground decoration: blocks only if it has actions (a trapdoor does, flowers do not) |
+| anything else | solid object: blocks its whole footprint; rotations 1 and 3 swap it |
+
+### 4.5 The three mistakes that cost the most time
+
+1. **Strings end at `10`, not `0`.** The zero that follows belongs to the enclosing
+   record. Stopping at zero swallows that terminator, walks into the next definition,
+   and produces one enormous entry built from the tail of the file. `flo.dat` parsed
+   "successfully" as two definitions instead of 128.
+2. **Floor ids are one-based.** The client looks them up as `Flo.cache[id - 1]`, and
+   `0` means "no floor". Reading them zero-based shifts every surface by one entry,
+   which is invisible until the grey road turns into the black dungeon stone вЂ” the two
+   happen to be adjacent in the table.
+3. **Colours are not RGB.** A floor's `0xRRGGBB` is converted to HSL, its lightness is
+   scaled to three-quarters, and the result indexes a 65536-entry palette with a gamma
+   of 0.8 applied. Drawing the raw RGB gives a flat, muddy world; skipping the gamma
+   makes everything about a third too dark.
+
+### 4.6 Still not ported
+
+* **Object models.** Objects are placeholders: walls as short stone slabs, trees and
+  rocks as simple shapes classified by name. The cache has the real models.
+* **Textures.** Floors with a texture id and no colour get an approximation. The
+  original paints them from the texture archive.
+* **Other planes.** Only plane 0 is rendered and only plane 0 has collision, which is
+  right for a surface world and wrong the moment a staircase exists.
+* **Region packets.** The client loads regions straight from disk instead of being
+  sent them, which works because both sides have the cache. A client without one
+  cannot play, where the original could stream the map.
+
+## 5. Interaction sequencing
 
 The client must remember what was clicked and re-issue the action on arrival.
 The original holds `crossX`/`crossY`/`crossType`/`crossIndex` (the little marker)
@@ -261,35 +332,33 @@ Menu action ids, for reference:
 | Player option 1..5 | 561, 779, 27, 577, 729 |
 | Use item on object / ground / NPC / player | 62 / 511 / 582 / 491 |
 
-`if (menuAction >= 2000) menuAction -= 2000;` — the `+2000` marker means "attack a
+`if (menuAction >= 2000) menuAction -= 2000;` вЂ” the `+2000` marker means "attack a
 higher-level target". Missing it puts every option index off by one.
 
-### 4.3 Menu priority
+## 6. Menu priority
 
 Which action a click produces depends on what is under the cursor at that exact
 pixel, ordered by distance from the cursor, with NPCs beating ground items beating
 objects beating walk. The current implementation checks tile membership, which is
 why clicking the corner of a diagonal NPC walks instead of attacking.
 
-### 4.4 Run
+## 7. Run
 
 `RunEnabled` is read from the walk packet's trailing byte and the server applies two
 tiles per tick while energy lasts, draining 100 per step. What is still missing is
 the original's guard: it only takes the second step when the remaining path is long
-enough, and the client's own prediction does not run at two tiles per tick yet — so
+enough, and the client's own prediction does not run at two tiles per tick yet вЂ” so
 running currently makes the client one step behind per tick rather than visibly
 faster.
 
-### 4.5 Path continuation
+## 8. Path continuation
 
 The server remembers the requested destination (`Player.WalkDestination`) and
 re-paths when the 25-tile queue empties, so a long click actually arrives instead of
 stopping a tile short. The client still caps at 25 and stops, which is correct for
 the original but means a click further than 25 tiles needs a second click.
 
----
-
-## 5. What was wrong before this port
+## What was wrong before this port
 
 Kept here because the same mistakes are easy to repeat.
 
@@ -302,3 +371,8 @@ Kept here because the same mistakes are easy to repeat.
 | `129` skill levels | `WriteByteA` wrote the plain value while the reader subtracted 128 |
 | Client died on login | `NetworkStream.ReadTimeout = 0` throws; needs `Timeout.Infinite` |
 | Mouse dead on login screen | `OnMouseDown` returned early in login mode |
+| Floor table parsed as 2 entries instead of 128 | Strings end at `10`, not `0`; stopping at zero ate the record terminator |
+| Grey road rendered as black stone | Floor ids are one-based into `flo.dat` |
+| Objects with negative ids at the region corner | Object blocks use `getSmart`, not the model-delta `getSmartB` |
+| Everything white in a saved PNG | Palette returned `0x00RRGGBB`; a zero alpha byte renders as white |
+| World flat and muddy | Cache colours are HSL indices, not RGB; the gamma of 0.8 is what lifts them |

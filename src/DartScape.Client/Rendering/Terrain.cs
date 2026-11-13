@@ -3,17 +3,57 @@ using DartScape.Game;
 
 namespace DartScape.Client.Rendering
 {
+    /// <summary>What kind of scenery stands on a tile.</summary>
+    /// <remarks>
+    /// This is a rendering classification, not a game one: the cache describes objects by
+    /// definition id and name, and the renderer only needs to know which placeholder shape to
+    /// draw until real object models are loaded.
+    /// </remarks>
+    public enum PropKind
+    {
+        None = 0,
+        Tree,
+        Rock,
+        Wall
+    }
+
+    /// <summary>One piece of scenery, as the renderer needs it.</summary>
+    public struct PropInfo
+    {
+        public PropKind Kind;
+
+        /// <summary>Wall face, 0..3. Unused for trees and rocks.</summary>
+        public int Rotation;
+
+        /// <summary>Footprint width, in tiles.</summary>
+        public int SizeX;
+
+        /// <summary>Footprint depth, in tiles.</summary>
+        public int SizeY;
+    }
+
     /// <summary>
-    /// Terrain colours and shading for the renderer.
+    /// Terrain and scenery as the renderer sees them.
     /// </summary>
     /// <remarks>
-    /// The shape of the world — heights, terrain classes, where the trees are — lives in
-    /// <see cref="WorldTerrain"/> in the game layer, because the server has to agree with the
-    /// client about it. This class only decides what those facts look like, which is a
-    /// rendering concern and belongs here.
+    /// <para>
+    /// The shape of the world comes from the cache through <see cref="Map"/>, and this class
+    /// turns it into the two things drawing needs: a height in render units and a colour.
+    /// </para>
+    /// <para>
+    /// Heights are converted once, here. The cache stores elevation in its own units, where sea
+    /// level is 0 and a hill is around 60; <see cref="IsoProjection.HeightStep"/> pixels per
+    /// unit is calibrated so those numbers land where the original client would put them. The
+    /// divisor is not arbitrary: the cache's own vertex heights are eight times its elevation,
+    /// and matching the original's proportions means eight elevation units per height step.
+    /// </para>
     /// </remarks>
     public static class Terrain
     {
+        /// <summary>Elevation units per render height step.</summary>
+        public const double UnitsPerHeightStep = 8.0;
+
+        /// <summary>Terrain classes of the procedural fallback.</summary>
         public const int Water = WorldTerrain.Water;
         public const int Sand = WorldTerrain.Sand;
         public const int Grass = WorldTerrain.Grass;
@@ -22,27 +62,51 @@ namespace DartScape.Client.Rendering
 
         public const int MaxHeight = WorldTerrain.MaxHeight;
 
-        /// <summary>Elevation of a grid corner.</summary>
-        public static int CornerHeight(int cx, int cy)
-        {
-            return WorldTerrain.CornerHeight(cx, cy);
-        }
+        /// <summary>
+        /// The real world map, or <c>null</c> when no cache is available.
+        /// </summary>
+        /// <remarks>
+        /// Set once at startup. When it is null everything falls back to the procedural
+        /// heightfield, which keeps the client usable without a cache instead of showing a
+        /// blank screen.
+        /// </remarks>
+        public static WorldMap Map;
 
-        /// <summary>Height of the tile at (x, y).</summary>
-        public static int HeightAt(int x, int y)
+        private const int SeaColour = 0x2E5C8A;
+        private const int UnknownColour = 0x6E6E64;
+
+        /// <summary>True when the real map is loaded.</summary>
+        public static bool HasRealMap
         {
-            return WorldTerrain.HeightAt(x, y);
+            get { return Map != null; }
         }
 
         /// <summary>
-        /// Elevation at a fractional world position, interpolated between tiles.
+        /// Height of a grid corner, in render units.
         /// </summary>
         /// <remarks>
-        /// Tile heights are whole numbers, so sampling the height of the tile an entity is
-        /// standing on makes it jump a whole height unit the instant it crosses a tile boundary
-        /// on a slope. At <see cref="IsoProjection.HeightStep"/> pixels per unit that is a
-        /// visible hop every step, and it is one of the reasons walking on hills looked jittery.
-        /// Interpolating turns the hop into a slope.
+        /// Corners are shared by up to four tiles, which is what makes the ground continuous
+        /// instead of a staircase.
+        /// </remarks>
+        public static double CornerHeight(int cx, int cy)
+        {
+            if (Map == null) return WorldTerrain.CornerHeight(cx, cy);
+
+            return Map.CornerHeight(cx, cy) / UnitsPerHeightStep;
+        }
+
+        /// <summary>Height of a tile's south-west corner, in render units.</summary>
+        public static double HeightAt(int x, int y)
+        {
+            return CornerHeight(x, y);
+        }
+
+        /// <summary>
+        /// Elevation at a fractional world position, interpolated between corners.
+        /// </summary>
+        /// <remarks>
+        /// Sampling the height of the tile an entity stands on makes it jump a whole height
+        /// unit the instant it crosses a tile boundary on a slope, which is very visible.
         /// </remarks>
         public static double SmoothHeight(double x, double y)
         {
@@ -52,10 +116,10 @@ namespace DartScape.Client.Rendering
             double tx = x - x0;
             double ty = y - y0;
 
-            double h00 = WorldTerrain.HeightAt(x0, y0);
-            double h10 = WorldTerrain.HeightAt(x0 + 1, y0);
-            double h01 = WorldTerrain.HeightAt(x0, y0 + 1);
-            double h11 = WorldTerrain.HeightAt(x0 + 1, y0 + 1);
+            double h00 = CornerHeight(x0, y0);
+            double h10 = CornerHeight(x0 + 1, y0);
+            double h01 = CornerHeight(x0, y0 + 1);
+            double h11 = CornerHeight(x0 + 1, y0 + 1);
 
             double top = h00 + (h10 - h00) * tx;
             double bottom = h01 + (h11 - h01) * tx;
@@ -63,67 +127,210 @@ namespace DartScape.Client.Rendering
             return top + (bottom - top) * ty;
         }
 
-        /// <summary>Terrain class for a tile.</summary>
+        /// <summary>Terrain class of a tile, used only by the procedural fallback.</summary>
         public static int TypeAt(int x, int y)
         {
             return WorldTerrain.TypeAt(x, y);
         }
 
-        /// <summary>Elevation used for drawing.</summary>
-        public static int RenderHeight(int x, int y)
+        /// <summary>True when the tile is water.</summary>
+        public static bool IsWater(int x, int y)
         {
-            return WorldTerrain.HeightAt(x, y);
-        }
+            if (Map == null) return WorldTerrain.TypeAt(x, y) == WorldTerrain.Water;
 
-        /// <summary>True when a tree stands on this tile.</summary>
-        public static bool HasTree(int x, int y)
-        {
-            return WorldTerrain.HasTree(x, y);
-        }
-
-        /// <summary>True when a boulder stands on this tile.</summary>
-        public static bool HasBoulder(int x, int y)
-        {
-            return WorldTerrain.HasBoulder(x, y);
+            return Map.GetTile(x, y).Water;
         }
 
         /// <summary>
-        /// Colour for a tile, shaded by the slope of its surface.
+        /// Packed colour of a tile.
         /// </summary>
         /// <remarks>
-        /// The slope term is the whole reason the terrain reads as three-dimensional: a face
-        /// turned away from the light is darker, so a hill gets a lit side and a shadowed side
-        /// even though the base colour is identical.
+        /// The cache does not store a colour per tile. It stores two floor ids, and each floor
+        /// is one of a hundred-odd definitions with a colour. That is why the world reads as
+        /// coherent: there are only a handful of distinct surfaces, and they repeat.
         /// </remarks>
+        public static int ColourAt(int x, int y)
+        {
+            if (Map == null)
+            {
+                return ColourFor(WorldTerrain.TypeAt(x, y), x, y,
+                    WorldTerrain.CornerHeight(x, y), WorldTerrain.CornerHeight(x + 1, y),
+                    WorldTerrain.CornerHeight(x, y + 1), WorldTerrain.CornerHeight(x + 1, y + 1));
+            }
+
+            TileInfo tile = Map.GetTile(x, y);
+
+            if (!tile.Exists) return Palette.TerrainColour(UnknownColour);
+
+            if (tile.Water) return Shade(Palette.TerrainColour(SeaColour), Jitter(x, y, 0.05));
+
+            int colour = FloorColour(tile.Overlay);
+            if (colour == 0) colour = FloorColour(tile.Underlay);
+            if (colour == 0) colour = Palette.TerrainColour(UnknownColour);
+
+            return Shade(colour, Jitter(x, y, 0.04));
+        }
+
+        /// <summary>
+        /// Colour of one floor definition, already put through the original's palette.
+        /// </summary>
+        /// <remarks>
+        /// The cache stores a floor as plain <c>0xRRGGBB</c>, but the client does not draw that
+        /// value: it converts it to HSL, scales the lightness to three-quarters, and looks the
+        /// result up in a gamma-corrected palette. Doing the same is what makes the ground read
+        /// as RuneScape rather than as flat blocks — the gamma lifts the midtones and the
+        /// lightness scaling keeps the floor behind the scenery instead of competing with it.
+        /// </remarks>
+        private static int FloorColour(int floorId)
+        {
+            if (floorId <= 0 || Map == null) return 0;
+
+            // Tile floor ids are ONE-based into flo.dat: the client looks them up as
+            // Flo.cache[id - 1], and id 0 means "no floor". Reading them as zero-based shifts
+            // every surface by one entry, which is invisible until it turns the grey road into
+            // the black dungeon stone — the two happen to sit next to each other in the table.
+            Core.Cache.FloorDefinition floor = Map.Floors.Get(floorId - 1);
+            if (floor == null) return 0;
+
+            if (floor.IsWater) return Palette.TerrainColour(SeaColour);
+
+            if (floor.Colour != 0) return Palette.TerrainColour(floor.Colour);
+
+            // A handful of floors are texture-only and carry no colour, because the client
+            // paints them with a bitmap. Without the texture loader, a plausible surface
+            // colour derived from the texture id is better than black.
+            if (floor.TextureId >= 0)
+            {
+                int shade = 74 + (floor.TextureId * 37 % 48);
+                return Palette.TerrainColour((shade << 16) | ((shade - 6) << 8) | (shade - 18));
+            }
+
+            return Palette.TerrainColour(UnknownColour);
+        }
+
+        /// <summary>
+        /// Scenery on a tile, if the renderer has a placeholder for it.
+        /// </summary>
+        /// <remarks>
+        /// The cache gives every object a name, and that is enough to tell a tree from a rock
+        /// without loading a single model. Walls are recognised by their config type instead,
+        /// because they have no useful name and their shape is what matters.
+        /// </remarks>
+        public static bool TryGetProp(int x, int y, out PropInfo prop)
+        {
+            prop = new PropInfo();
+
+            if (Map == null)
+            {
+                if (WorldTerrain.HasTree(x, y))
+                {
+                    prop.Kind = PropKind.Tree;
+                    prop.SizeX = 1;
+                    prop.SizeY = 1;
+                    return true;
+                }
+
+                if (WorldTerrain.HasBoulder(x, y))
+                {
+                    prop.Kind = PropKind.Rock;
+                    prop.SizeX = 1;
+                    prop.SizeY = 1;
+                    return true;
+                }
+
+                return false;
+            }
+
+            System.Collections.Generic.List<Core.Cache.LandscapeObject> objects = Map.ObjectsAt(x, y);
+            if (objects == null) return false;
+
+            PropKind best = PropKind.None;
+            int bestRotation = 0;
+            int bestSizeX = 1, bestSizeY = 1;
+
+            for (int i = 0; i < objects.Count; i++)
+            {
+                Core.Cache.LandscapeObject placed = objects[i];
+                if (placed.Plane != 0) continue;
+
+                PropKind kind = Classify(placed);
+
+                // Trees and rocks beat walls, because a tree's canopy covers the wall behind
+                // it. Within the same kind the first placement wins, which is the cache's own
+                // ordering.
+                if (kind == PropKind.None) continue;
+                if (best != PropKind.None && kind != PropKind.Tree && kind != PropKind.Rock) continue;
+                if (best == PropKind.Tree || best == PropKind.Rock) continue;
+
+                best = kind;
+                bestRotation = placed.Rotation;
+
+                Core.Cache.ObjectDefinition definition = Map.Objects.Get(placed.Id);
+                if (definition != null)
+                {
+                    bestSizeX = definition.SizeX;
+                    bestSizeY = definition.SizeY;
+                }
+            }
+
+            if (best == PropKind.None) return false;
+
+            prop.Kind = best;
+            prop.Rotation = bestRotation;
+            prop.SizeX = bestSizeX;
+            prop.SizeY = bestSizeY;
+            return true;
+        }
+
+        private static PropKind Classify(Core.Cache.LandscapeObject placed)
+        {
+            if (placed.Type >= 0 && placed.Type <= 3) return PropKind.Wall;
+            if (placed.Type == 4 || placed.Type == 5 || placed.Type == 6 ||
+                placed.Type == 7 || placed.Type == 8) return PropKind.None;
+
+            Core.Cache.ObjectDefinition definition = Map.Objects.Get(placed.Id);
+            if (definition == null || definition.Name == null) return PropKind.None;
+
+            string name = definition.Name;
+
+            if (Contains(name, "tree") || Contains(name, "oak") || Contains(name, "willow") ||
+                Contains(name, "maple") || Contains(name, "yew") || Contains(name, "magic"))
+            {
+                return PropKind.Tree;
+            }
+
+            if (Contains(name, "rock") || Contains(name, "boulder") || Contains(name, "ore") ||
+                Contains(name, "rocks"))
+            {
+                return PropKind.Rock;
+            }
+
+            return PropKind.None;
+        }
+
+        private static bool Contains(string text, string what)
+        {
+            return text.IndexOf(what, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>Colour for a procedural tile, used when there is no cache.</summary>
         public static int ColourFor(int type, int x, int y, int h00, int h10, int h01, int h11)
         {
-            double jitter = (Hash(x * 7 + 11, y * 13 + 3) - 0.5) * 0.10;
-
             int r, g, b;
 
             switch (type)
             {
-                case Water:
-                    r = 44; g = 84; b = 126;
-                    break;
-
-                case Sand:
-                    r = 190; g = 174; b = 120;
-                    break;
-
-                case Dirt:
-                    r = 132; g = 112; b = 82;
-                    break;
-
-                case Rock:
+                case WorldTerrain.Water: r = 44; g = 84; b = 126; break;
+                case WorldTerrain.Sand: r = 190; g = 174; b = 120; break;
+                case WorldTerrain.Dirt: r = 132; g = 112; b = 82; break;
+                case WorldTerrain.Rock:
                     if (h00 + h10 + h01 + h11 >= 42) { r = 176; g = 178; b = 184; }
                     else { r = 120; g = 120; b = 124; }
                     break;
-
-                default:
-                    r = 84; g = 124; b = 58;
-                    break;
+                default: r = 84; g = 124; b = 58; break;
             }
+
+            double jitter = (Hash(x * 7 + 11, y * 13 + 3) - 0.5) * 0.10;
 
             r = Clamp(r + (int)(jitter * 40));
             g = Clamp(g + (int)(jitter * 44));
@@ -133,21 +340,26 @@ namespace DartScape.Client.Rendering
         }
 
         /// <summary>Darkens (negative) or lightens (positive) a packed colour by a fraction.</summary>
+        /// <remarks>
+        /// The result is always opaque ARGB, including when the amount is zero. Returning the
+        /// input unchanged in that case looks like a harmless optimisation and is not: a caller
+        /// that passes a bare <c>0xRRGGBB</c> gets a pixel with a zero alpha byte back, which the
+        /// framebuffer stores as fully transparent. In a saved PNG that is white, so a wall that
+        /// skipped shading appeared as a blank white bar with no error anywhere.
+        /// </remarks>
         public static int Shade(int argb, double amount)
         {
-            if (amount == 0) return argb;
-
             int r = (argb >> 16) & 0xFF;
             int g = (argb >> 8) & 0xFF;
             int b = argb & 0xFF;
 
-            if (amount >= 0)
+            if (amount > 0)
             {
                 r = Clamp((int)(r + (255 - r) * amount));
                 g = Clamp((int)(g + (255 - g) * amount));
                 b = Clamp(b + (int)((255 - b) * amount));
             }
-            else
+            else if (amount < 0)
             {
                 double factor = 1.0 + amount;
                 r = Clamp((int)(r * factor));
@@ -156,6 +368,11 @@ namespace DartScape.Client.Rendering
             }
 
             return Framebuffer.Rgb(r, g, b);
+        }
+
+        private static double Jitter(int x, int y, double amount)
+        {
+            return (Hash(x * 3 + 17, y * 5 + 29) - 0.5) * amount;
         }
 
         private static int Clamp(int value)
@@ -207,10 +424,9 @@ namespace DartScape.Client.Rendering
         /// Pixels of vertical lift per height unit.
         /// </summary>
         /// <remarks>
-        /// This is the number that decides whether the terrain reads as hilly or flat. At 7
-        /// pixels against a 32-pixel tile a four-unit step lifted a corner by 28 pixels, about
-        /// one tile row, which was barely perceptible. Roughly a third of a tile per height
-        /// unit is what looks right.
+        /// One render height unit is eight cache elevation units, and at sixteen pixels per
+        /// unit a hill of elevation 60 lifts by 120 pixels — a little under four tile heights,
+        /// which is the proportion the original client gives it.
         /// </remarks>
         public const int HeightStep = 16;
 
@@ -298,7 +514,7 @@ namespace DartScape.Client.Rendering
 
             for (int pass = 0; pass < 2; pass++)
             {
-                int height = Terrain.RenderHeight(tileX, tileY);
+                double height = Terrain.HeightAt(tileX, tileY);
                 if (height == 0) break;
 
                 int rx, ry;
@@ -311,7 +527,7 @@ namespace DartScape.Client.Rendering
             }
         }
 
-        private void UnprojectRaw(int screenX, int screenY, int height, out int tileX, out int tileY)
+        private void UnprojectRaw(int screenX, int screenY, double height, out int tileX, out int tileY)
         {
             // dx - dy = a, dx + dy = b  =>  dx = (a + b) / 2, dy = (b - a) / 2
             double a = (double)(screenX - OriginX) / HalfWidth;

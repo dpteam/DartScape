@@ -154,19 +154,13 @@ namespace DartScape.Client.Rendering
             int tileX = (int)Math.Floor(wx0 + 0.5);
             int tileY = (int)Math.Floor(wy0 + 0.5);
 
-            int type = Terrain.TypeAt(tileX, tileY);
+            bool water = Terrain.IsWater(tileX, tileY);
 
             // Four corner heights, shared with the neighbouring tiles by construction.
-            int h00 = Terrain.CornerHeight(tileX, tileY);
-            int h10 = Terrain.CornerHeight(tileX + 1, tileY);
-            int h01 = Terrain.CornerHeight(tileX, tileY + 1);
-            int h11 = Terrain.CornerHeight(tileX + 1, tileY + 1);
-
-            // Water is a flat plane: it does not follow the sea bed.
-            if (type == Terrain.Water)
-            {
-                h00 = h10 = h01 = h11 = 0;
-            }
+            double h00 = Terrain.CornerHeight(tileX, tileY);
+            double h10 = Terrain.CornerHeight(tileX + 1, tileY);
+            double h01 = Terrain.CornerHeight(tileX, tileY + 1);
+            double h11 = Terrain.CornerHeight(tileX + 1, tileY + 1);
 
             // Screen positions of the four corners. Corner (x, y) is the back one.
             // The loop walks offsets from the camera, but the projection wants absolute
@@ -197,7 +191,7 @@ namespace DartScape.Client.Rendering
             if (maxX < 0 || minX > target.Width) return;
             if (maxY < 0 || minY > target.Height) return;
 
-            int baseColour = Terrain.ColourFor(type, tileX, tileY, h00, h10, h01, h11);
+            int baseColour = Terrain.ColourAt(tileX, tileY);
 
             // Two triangles, each flat-shaded from its own slope. The split runs along the
             // diagonal that keeps the facet edges pointing the way the light does.
@@ -209,28 +203,50 @@ namespace DartScape.Client.Rendering
 
             // A thin darker line along the two far edges separates tiles without drawing a
             // visible grid. Water gets none: the sea reads better as one plane.
-            if (type != Terrain.Water)
+            if (!water)
             {
                 int edge = Terrain.Shade(baseColour, -0.18);
                 DrawLine(target, x00, y00, x10, y10, edge);
                 DrawLine(target, x00, y00, x01, y01, edge);
             }
 
-            // --- ground items --------------------------------------------------
             int centreX = (x00 + x11) / 2;
             int centreY = (y00 + y11) / 2;
 
-            DrawGroundItems(target, world, tileX, tileY, centreX, centreY);
+            // --- cliffs --------------------------------------------------------
+            // A tile whose neighbour is lower has a visible vertical face between them. Without
+            // it the gap shows the sky through the terrain, which reads as a hole in the world
+            // rather than a cliff — and Lumbridge is built almost entirely on one.
+            //
+            // The face is drawn from this tile's edge down to the neighbour's height, and it is
+            // drawn before the scenery so a tree at the bottom of the cliff is not covered.
+            DrawCliffFaces(target, projection, tileX, tileY, avx, avy,
+                x00, y00, x10, y10, x01, y01, x11, y11);
 
-            // --- props ---------------------------------------------------------
-            if (Terrain.HasTree(tileX, tileY))
+            // --- scenery -------------------------------------------------------
+            // Drawn before the entities so a player standing in a doorway is not hidden by the
+            // wall behind them.
+            PropInfo prop;
+            if (Terrain.TryGetProp(tileX, tileY, out prop))
             {
-                DrawTree(target, centreX, centreY, tileX, tileY);
+                switch (prop.Kind)
+                {
+                    case PropKind.Wall:
+                        DrawWall(target, prop.Rotation, x00, y00, x10, y10, x01, y01, x11, y11);
+                        break;
+
+                    case PropKind.Tree:
+                        DrawTree(target, centreX, centreY, tileX, tileY);
+                        break;
+
+                    case PropKind.Rock:
+                        DrawBoulder(target, centreX, centreY, tileX, tileY);
+                        break;
+                }
             }
-            else if (Terrain.HasBoulder(tileX, tileY))
-            {
-                DrawBoulder(target, centreX, centreY, tileX, tileY);
-            }
+
+            // --- ground items --------------------------------------------------
+            DrawGroundItems(target, world, tileX, tileY, centreX, centreY);
 
             // --- entities standing on this tile --------------------------------
             for (int i = 0; i < entities.Count; i++)
@@ -254,18 +270,133 @@ namespace DartScape.Client.Rendering
         }
 
         /// <summary>
+        /// Draws the vertical faces where a tile drops to a lower neighbour.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Four edges are tested independently because a tile can be a cliff on one side and
+        /// flush on another — a terrace, which is common on the Lumbridge ridge. Each face is a
+        /// quad from this tile's edge down to the neighbour's height at the same corners.
+        /// </para>
+        /// <para>
+        /// The faces are shaded darker than the top: they are vertical, so they catch less of
+        /// the light. That contrast is what makes the terrain read as solid instead of painted.
+        /// </para>
+        /// </remarks>
+        private void DrawCliffFaces(Framebuffer target, IsoProjection projection,
+            int tileX, int tileY, double avx, double avy,
+            int x00, int y00, int x10, int y10, int x01, int y01, int x11, int y11)
+        {
+            // West edge (x-1), south edge (y-1), east edge (x+1), north edge (y+1).
+            DrawCliffFace(target, projection, avx, avy,
+                tileX - 1, tileY, 0, 0, 0, 1, x00, y00, x01, y01, -0.34);
+
+            DrawCliffFace(target, projection, avx, avy,
+                tileX, tileY - 1, 0, 0, 1, 0, x00, y00, x10, y10, -0.46);
+
+            DrawCliffFace(target, projection, avx, avy,
+                tileX + 1, tileY, 1, 0, 1, 1, x10, y10, x11, y11, -0.28);
+
+            DrawCliffFace(target, projection, avx, avy,
+                tileX, tileY + 1, 0, 1, 1, 1, x01, y01, x11, y11, -0.40);
+        }
+
+        /// <summary>
+        /// Draws one cliff face, if the neighbour really is lower.
+        /// </summary>
+        /// <param name="offsetAX">View offset of the face's first corner from the tile origin.</param>
+        private void DrawCliffFace(Framebuffer target, IsoProjection projection, double avx, double avy,
+            int neighbourX, int neighbourY,
+            int offsetAX, int offsetAY, int offsetBX, int offsetBY,
+            int ax, int ay, int bx, int by, double shade)
+        {
+            double neighbourHeight = Terrain.CornerHeight(neighbourX, neighbourY);
+
+            int topAX = ay, topBX = by;
+            int bottomAY = projection.ScreenY(avx + offsetAX, avy + offsetAY, neighbourHeight);
+            int bottomBY = projection.ScreenY(avx + offsetBX, avy + offsetBY, neighbourHeight);
+
+            // Nothing to draw when the neighbour is level with us or higher: its own face
+            // handles the drop, and drawing here would double-shade the seam.
+            if (bottomAY <= topAX && bottomBY <= topBX) return;
+
+            int colour = Terrain.Shade(Terrain.ColourAt(neighbourX, neighbourY), shade);
+
+            target.FillQuad(ax, topAX, bx, topBX, bx, bottomBY, ax, bottomAY, colour);
+        }
+
+        /// <summary>
+        /// Draws a wall standing on one edge of a tile.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Walls are not billboards: they sit on a tile edge and have to be projected as a quad
+        /// between two corners, otherwise they drift off the tile as the camera rotates. The
+        /// face is picked by the object's rotation, which is the same value the collision map
+        /// uses, so a wall you can see is a wall you cannot walk through.
+        /// </para>
+        /// <para>
+        /// Until real object models are loaded this is a plain slab. The colour and outline are
+        /// doing all the work of making it read as masonry rather than as a blank panel: a
+        /// flat light fill with no edge is indistinguishable from a hole in the screen.
+        /// </para>
+        /// </remarks>
+        private void DrawWall(Framebuffer target, int rotation,
+            int x00, int y00, int x10, int y10, int x01, int y01, int x11, int y11)
+        {
+            // Wall height in pixels. Low on purpose: without object models a tall slab reads as
+            // a floating panel rather than masonry, and it hides the floor behind it.
+            const int wallPixels = 14;
+
+            int ax, ay, bx, by;
+
+            switch (rotation & 3)
+            {
+                case 0: ax = x00; ay = y00; bx = x01; by = y01; break;   // west edge
+                case 1: ax = x00; ay = y00; bx = x10; by = y10; break;   // south edge
+                case 2: ax = x10; ay = y10; bx = x11; by = y11; break;   // east edge
+                default: ax = x01; ay = y01; bx = x11; by = y11; break;  // north edge
+            }
+
+            // Face lighting: the two edges facing the viewer are lit, the far ones are not.
+            // The contrast between adjacent faces is what makes a corner read as a corner.
+            int face = rotation & 3;
+            double shade = face == 1 ? 0.0 : face == 3 ? -0.20 : -0.09;
+
+            int colour = Terrain.Shade(0x7E7466, shade);
+            int cap = Terrain.Shade(colour, 0.08);
+
+            target.FillQuad(ax, ay, bx, by, bx, by - wallPixels, ax, ay - wallPixels, colour);
+
+            // A slightly lighter cap along the top and a dark line at the base give the slab
+            // thickness and ground it. The cap has to stay close to the face colour: a bright
+            // one turns the whole wall into a white bar and the face disappears underneath it.
+            DrawLine(target, ax, ay - wallPixels, bx, by - wallPixels, cap);
+            DrawLine(target, ax, ay, bx, by, Terrain.Shade(colour, -0.34));
+
+            // The vertical seams at each end stop two wall segments reading as one long slab.
+            DrawLine(target, ax, ay, ax, ay - wallPixels, Terrain.Shade(colour, -0.26));
+            DrawLine(target, bx, by, bx, by - wallPixels, Terrain.Shade(colour, -0.26));
+        }
+
+        /// <summary>
         /// Lighting term for one triangle, from the elevation of its three corners.
         /// </summary>
-        private static double SlopeLight(int h0, int h1, int h2)
+        private static double SlopeLight(double h0, double h1, double h2)
         {
             // Gradient across the triangle in tile space. The two edges share corner 0.
-            int dh1 = h1 - h0;
-            int dh2 = h2 - h0;
+            double dh1 = h1 - h0;
+            double dh2 = h2 - h0;
 
-            double light = -(dh1 * 0.055) - (dh2 * 0.075);
+            // Gentle, and asymmetric on purpose: a face turned away from the light is shaded,
+            // but nothing is ever brightened past the floor's own colour. The cache's colours
+            // are already the "lit" values — the original rebuilds them through an HSL palette
+            // at 96/128 lightness rather than adding light — so brightening here washes the
+            // dark surfaces out to grey and leaves the walls looking like blank panels.
+            double light = -(dh1 * 0.030) - (dh2 * 0.042);
 
-            if (light > 0.20) light = 0.20;
-            if (light < -0.34) light = -0.34;
+            if (light > 0.02) light = 0.02;
+            if (light < -0.20) light = -0.20;
 
             return light;
         }
@@ -396,10 +527,10 @@ namespace DartScape.Client.Rendering
 
             target.FillDiamond(cx, baseY, 9, 4, Framebuffer.Argb(105, 0, 0, 0));
 
-            int torso = overrideBody ?? (colours != null ? Palette.Colour(colours[1]) : Framebuffer.Rgb(92, 112, 152));
-            int legs = overrideBody ?? (colours != null ? Palette.Colour(colours[2]) : Framebuffer.Rgb(68, 68, 88));
-            int skin = colours != null ? Palette.Colour(colours[4]) : Framebuffer.Rgb(226, 188, 150);
-            int hair = colours != null ? Palette.Colour(colours[0]) : Framebuffer.Rgb(82, 56, 36);
+            int torso = overrideBody ?? (colours != null ? Palette.Part(Palette.Torso, colours[1]) : Framebuffer.Rgb(92, 112, 152));
+            int legs = overrideBody ?? (colours != null ? Palette.Part(Palette.Legs, colours[2]) : Framebuffer.Rgb(68, 68, 88));
+            int skin = colours != null ? Palette.Part(Palette.Skin, colours[4]) : Framebuffer.Rgb(226, 188, 150);
+            int hair = colours != null ? Palette.Part(Palette.Hair, colours[0]) : Framebuffer.Rgb(82, 56, 36);
 
             // Legs, with a dark seam between them.
             target.FillRect(cx - 6, top + height - 16, 5, 16, legs);
@@ -495,13 +626,13 @@ namespace DartScape.Client.Rendering
                     double wx, wy;
                     IsoProjection.Unrotate(world.MyX + dx, world.MyY + dy, world.CameraRotation, out wx, out wy);
 
-                    int type = Terrain.TypeAt((int)Math.Round(wx), (int)Math.Round(wy));
+                    int tileX = (int)Math.Round(wx);
+                    int tileY = (int)Math.Round(wy);
 
-                    int colour = type == Terrain.Water ? Framebuffer.Rgb(38, 66, 104)
-                        : type == Terrain.Sand ? Framebuffer.Rgb(166, 150, 102)
-                        : type == Terrain.Dirt ? Framebuffer.Rgb(120, 102, 74)
-                        : type == Terrain.Rock ? Framebuffer.Rgb(98, 98, 102)
-                        : Framebuffer.Rgb(60, 100, 50);
+                    // The minimap is drawn from the same terrain the world is, so it shows the
+                    // real coastline and the real paths. Inventing a separate palette here is
+                    // how a map ends up disagreeing with the ground it claims to describe.
+                    int colour = Terrain.ColourAt(tileX, tileY);
 
                     target.FillRect(x + centre + dx * pixelsPerTile, y + centre + dy * pixelsPerTile,
                         pixelsPerTile, pixelsPerTile, colour);
@@ -561,40 +692,6 @@ namespace DartScape.Client.Rendering
             public ClientNpc Npc;
             public double WorldX;
             public double WorldY;
-        }
-    }
-
-    /// <summary>
-    /// Maps the client's body colour indices to RGB.
-    /// </summary>
-    /// <remarks>
-    /// The real palette lives in the cache's media archive. This is a compact approximation
-    /// covering the common values, enough for avatars to look distinct; loading the exact
-    /// palette is a pipeline item.
-    /// </remarks>
-    public static class Palette
-    {
-        private static readonly int[] Colours =
-        {
-            unchecked((int)0xFF8C5A28), unchecked((int)0xFFB08442), unchecked((int)0xFFD4B063),
-            unchecked((int)0xFFFFFFFF), unchecked((int)0xFF8C6B4A), unchecked((int)0xFF6B4A2A),
-            unchecked((int)0xFF3A2A1A), unchecked((int)0xFF8C3A28), unchecked((int)0xFFB04A28),
-            unchecked((int)0xFFD47A42), unchecked((int)0xFF2A3A6B), unchecked((int)0xFF3A4A8C),
-            unchecked((int)0xFF4A6BB0), unchecked((int)0xFF6B8CD4), unchecked((int)0xFF1A2A1A),
-            unchecked((int)0xFF2A4A2A), unchecked((int)0xFF3A6B3A), unchecked((int)0xFF4A8C4A),
-            unchecked((int)0xFF6BB06B), unchecked((int)0xFF8CD48C), unchecked((int)0xFF1A1A1A),
-            unchecked((int)0xFF2A2A2A), unchecked((int)0xFF3A3A3A), unchecked((int)0xFF6B6B6B),
-            unchecked((int)0xFF8C8C8C), unchecked((int)0xFFB0B0B0), unchecked((int)0xFFD4D4D4),
-            unchecked((int)0xFFFFFFFF), unchecked((int)0xFF4A1A1A), unchecked((int)0xFF6B2A2A),
-            unchecked((int)0xFF8C3A3A), unchecked((int)0xFFB04A4A)
-        };
-
-        /// <summary>Colour for a body colour index, wrapped into range.</summary>
-        public static int Colour(int index)
-        {
-            int i = index % Colours.Length;
-            if (i < 0) i += Colours.Length;
-            return Colours[i];
         }
     }
 }

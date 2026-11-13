@@ -91,7 +91,19 @@ namespace DartScape.Client.Net
             }
 
             var map = new CollisionMap(x - CollisionMap.Size / 2, y - CollisionMap.Size / 2);
-            WorldTerrain.BuildCollision(map, x, y, CollisionMap.Size / 2);
+
+            // The client paths on the same landscape the server validates against, so a click
+            // produces a path the server will accept rather than one it has to correct.
+            WorldMap worldMap = Rendering.Terrain.Map;
+
+            if (worldMap != null)
+            {
+                worldMap.BuildCollision(map, x, y, CollisionMap.Size / 2);
+            }
+            else
+            {
+                WorldTerrain.BuildCollision(map, x, y, CollisionMap.Size / 2);
+            }
 
             _collision = map;
             _paths = new PathFinder(map);

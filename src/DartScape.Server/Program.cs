@@ -129,6 +129,14 @@ namespace DartScape.Server
 
             // --- world ---------------------------------------------------------
             World = new World(Config);
+
+            // Load the real landscape from the same cache the client reads. Collision, and
+            // therefore pathfinding, comes from it: without this the server would be
+            // validating steps against invented terrain and disagreeing with what the player
+            // can see.
+            WorldMap map = WorldMap.Open(Config.Resolve(Config.CacheDir));
+            World.UseMap(map);
+
             SpawnWorldNpcs(World);
 
             // Publish the long-lived services so the game layer and the web layer can

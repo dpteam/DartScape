@@ -72,6 +72,8 @@ namespace DartScape.Client
             ClientConfig config = ClientConfig.Load(baseDir);
             ApplyArguments(args, config);
 
+            LoadMap(config, baseDir);
+
             // Offline render mode: draw one frame and exit. Kept in the shipped binary
             // because it is the only way to inspect the renderer without a display, and
             // because CI uses it to prove the renderer does not throw.
@@ -106,6 +108,42 @@ namespace DartScape.Client
         }
 
         /// <summary>
+        /// Loads the world map from the cache, or leaves the procedural fallback in place.
+        /// </summary>
+        /// <remarks>
+        /// The client reads the same cache the server does, from its own copy on disk. That is
+        /// how both sides agree about where the walls are without the server sending map data:
+        /// the map is part of the game, not part of the session.
+        /// </remarks>
+        private static void LoadMap(ClientConfig config, string baseDir)
+        {
+            string directory = string.IsNullOrEmpty(config.CacheDir)
+                ? System.IO.Path.Combine(baseDir, "cache")
+                : System.IO.Path.IsPathRooted(config.CacheDir)
+                    ? config.CacheDir
+                    : System.IO.Path.Combine(baseDir, config.CacheDir);
+
+            try
+            {
+                DartScape.Game.WorldMap map = DartScape.Game.WorldMap.Open(directory);
+
+                if (map == null)
+                {
+                    Log.Warning("Client", "No usable map in {0}; using procedural terrain.", directory);
+                    return;
+                }
+
+                Rendering.Terrain.Map = map;
+
+                Log.Info("Client", "Loaded {0} map regions from {1}.", map.RegionCount, directory);
+            }
+            catch (Exception ex)
+            {
+                Log.Exception("Client", ex, "Could not load the map from " + directory);
+            }
+        }
+
+        /// <summary>
         /// Renders one frame of the world to a PNG and exits.
         /// </summary>
         /// <remarks>
@@ -123,10 +161,10 @@ namespace DartScape.Client
                     Index = 1,
                     Name = "DartPower",
                     IsLocal = true,
-                    X = 3103,
-                    Y = 3136,
-                    LastX = 3103,
-                    LastY = 3136,
+                    X = 3222,
+                    Y = 3218,
+                    LastX = 3222,
+                    LastY = 3218,
                     CombatLevel = 42,
                     Hitpoints = 34,
                     MaxHitpoints = 43,
@@ -141,8 +179,7 @@ namespace DartScape.Client
 
                 world.Players[1] = me;
                 world.MyIndex = 1;
-                world.MyX = 3103;
-                world.MyY = 3136;
+                world.ForceLocalPosition(3222, 3218, 0);
 
                 // A few NPCs at plausible offsets so the sorting and occlusion are exercised.
                 int[] offsets = { 3, -2, -4, 5, 2, 6, -3, 4 };

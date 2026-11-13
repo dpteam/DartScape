@@ -77,15 +77,45 @@ namespace DartScape.Game
         /// Rebuilt whenever a player moves far enough that the local 104x104 window no longer
         /// covers them. One map is enough while everyone is in the same part of the world,
         /// which is the case for a single small world; a per-region map is the next step when
-        /// the landscape loader lands.
+        /// more than one group of players spreads out.
         /// </remarks>
         public CollisionMap Collision { get; private set; }
 
         /// <summary>The pathfinder over <see cref="Collision"/>.</summary>
         public PathFinder Paths { get; private set; }
 
+        /// <summary>
+        /// The real world map, or <c>null</c> when the server was started without a cache.
+        /// </summary>
+        /// <remarks>
+        /// This is the server's own copy of the landscape, loaded from the same cache files the
+        /// client reads. Neither side sends the other any map data: the map is part of the
+        /// game, not part of the session, and having both sides derive collision from the same
+        /// source is what lets the client predict a step the server will agree with.
+        /// </remarks>
+        public WorldMap Map { get; private set; }
+
         private int _collisionCentreX;
         private int _collisionCentreY;
+
+        /// <summary>
+        /// Installs the world map. Must be called before the first player logs in.
+        /// </summary>
+        public void UseMap(WorldMap map)
+        {
+            Map = map;
+
+            if (map == null)
+            {
+                Log.Warning("World", "No world map; collision will come from procedural terrain.");
+                return;
+            }
+
+            Log.Info("World", "Using the real map: {0} regions, {1} object definitions.",
+                map.RegionCount, map.Objects.Count);
+
+            RebuildCollision(_config.StartX, _config.StartY);
+        }
 
         /// <summary>Rebuilds the collision window around a world position.</summary>
         public void RebuildCollision(int centreX, int centreY)
@@ -97,7 +127,15 @@ namespace DartScape.Game
             int baseY = centreY - CollisionMap.Size / 2;
 
             var map = new CollisionMap(baseX, baseY);
-            WorldTerrain.BuildCollision(map, centreX, centreY, CollisionMap.Size / 2);
+
+            if (Map != null)
+            {
+                Map.BuildCollision(map, centreX, centreY, CollisionMap.Size / 2);
+            }
+            else
+            {
+                WorldTerrain.BuildCollision(map, centreX, centreY, CollisionMap.Size / 2);
+            }
 
             Collision = map;
             Paths = new PathFinder(map);
