@@ -53,6 +53,47 @@ jobs:
           & $exe --cache "assets\cache317"
           if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
 
+      # A live login is the only test that proves both halves of the protocol agree,
+      # so the server is started for real and the probe logs into it.
+      - name: Run live server probe
+        run: |
+          $server = "src\DartScape.Server\bin\Release\net40\DartScape.Server.exe"
+          if (-not (Test-Path $server)) { throw "Server not found at $server" }
+
+          $workingDirectory = Split-Path -Parent $server
+          New-Item -ItemType Directory -Path (Join-Path $workingDirectory 'cache') -Force | Out-Null
+          Copy-Item -Path 'assets\cache317\*' -Destination (Join-Path $workingDirectory 'cache') -Force
+
+          $process = Start-Process -FilePath $server -WorkingDirectory $workingDirectory `
+              -RedirectStandardOutput (Join-Path $workingDirectory 'server.log') -PassThru -NoNewWindow
+
+          try {
+              # Wait for the game port to accept connections, up to 30 seconds.
+              $ready = $false
+              for ($i = 0; $i -lt 30; $i++) {
+                  Start-Sleep -Seconds 1
+                  try {
+                      $client = New-Object System.Net.Sockets.TcpClient
+                      $client.Connect('127.0.0.1', 43594)
+                      $client.Close()
+                      $ready = $true
+                      break
+                  }
+                  catch { }
+              }
+
+              if (-not $ready) { throw "The server did not open port 43594 in time" }
+
+              $exe = "tests\DartScape.Tests\bin\Release\net40\DartScape.Tests.exe"
+              & $exe --live "127.0.0.1:43594"
+              if ($LASTEXITCODE -ne 0) { throw "The live probe failed with exit code $LASTEXITCODE" }
+          }
+          finally {
+              if (-not $process.HasExited) { $process.Kill() }
+              Write-Host '--- server log ---'
+              Get-Content (Join-Path $workingDirectory 'server.log') -ErrorAction SilentlyContinue
+          }
+
       - name: Check Windows XP compatibility
         run: pwsh -NoProfile -File tools/check-xp.ps1
 

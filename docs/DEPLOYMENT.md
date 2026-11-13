@@ -27,7 +27,6 @@ DartScape.Server.exe
 ```
 
 The first start:
-
 1. writes `config.ini` with defaults,
 2. generates `keys\server.key` (the RSA key used by the login handshake),
 3. generates an admin token and **prints it to the console only** — it is never
@@ -115,6 +114,32 @@ A daily copy is enough:
 ```bat
 robocopy "C:\DartScape\server\data" "D:\Backups\DartScape\data" /MIR /R:1 /W:1
 ```
+
+## Development instance
+
+`build.cmd` stages a complete, runnable server into the top-level `bin\` folder:
+
+```
+bin\
+  DartScape.Server.exe      and the assemblies it needs
+  public\  admin\           web assets
+  cache\                    the 317 cache
+  config.ini                written once, never overwritten
+  data\  logs\  keys\       runtime state
+```
+
+That folder is the development world. Start it with `run.cmd`, play in it, keep
+the characters between builds: a rebuild replaces binaries and web assets but
+leaves `config.ini`, `data\`, `keys\` and `logs\` alone. `build.cmd -Clean` wipes
+the build output and keeps those four as well.
+
+The whole `bin\` tree is gitignored, so binaries, the cache copy and the live
+world never enter the repository. Only `config.example.ini` is committed, as the
+documented template — copy it to `config.ini` to see every available key.
+
+The admin token is generated on first start into `bin\config.ini` and printed to
+the console. To use the same token as production, copy `config.ini` from the
+deployed server; to reset it, delete the `token` line and restart.
 
 ## Updating
 

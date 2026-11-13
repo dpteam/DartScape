@@ -28,6 +28,24 @@ build/out/
 *.csproj.user
 *.DotSettings.user
 
+# ---------------------------------------------------------------------------
+# Live development instance (the top-level bin/ folder)
+#
+# build.cmd stages a ready-to-run server there: binaries, the cache, the web
+# assets and a real config.ini. That whole folder is the working world, so none
+# of it belongs in git -- only config.example.ini documents what a config looks
+# like.
+# ---------------------------------------------------------------------------
+/bin/
+/config.ini
+/keys/
+/launcher-data/
+/data/accounts/
+/data/characters/
+/data/news.json
+/data/*.tmp
+/data/*.bak
+
 # Visual Studio
 .vs/
 *.vspscc

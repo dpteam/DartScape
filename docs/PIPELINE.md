@@ -203,16 +203,23 @@ first.
 ## Working on this
 
 ```powershell
-dotnet build DartScape.slnx -c Release
+build.cmd                                    # build, stage bin\, run tests
+run.cmd                                      # start the server from bin\
+dotnet build DartScape.slnx -c Release       # build only
 tests\DartScape.Tests\bin\Release\net40\DartScape.Tests.exe --cache assets\cache317
 tools\check-xp.ps1
 tools\check-standalone.ps1
 tools\package.ps1
 ```
 
+`build.cmd` is the normal entry point: it builds everything, stages a runnable
+instance into `bin\`, and runs the tests. The `bin\` folder is the development
+world — config, keys, accounts and characters live there and survive a rebuild.
+
 The test suite is the fastest way to know a change is safe: it covers the wire
 format, the crypto, the cache and the game model, and it runs in under two
-seconds.
+seconds. Add `--live 127.0.0.1:43594` to also probe a running server with a real
+login.
 
 When adding a packet, change `UpdateEncoder` and `PacketDecoder` together, and
 add a test that round-trips it. The two files are a matched pair for a reason.

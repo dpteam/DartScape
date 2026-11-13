@@ -330,9 +330,12 @@
   function showLogin(message) {
     dom.app.hidden = true;
     dom.loginGate.hidden = false;
+    state.busy = {};
     dom.loginSubmit.disabled = false;
     dom.loginSubmit.textContent = 'Sign in';
     dom.tokenInput.value = '';
+    /* Release any control a failed request left disabled. */
+    if (dom.consoleInput) { dom.consoleInput.disabled = false; }
     setLoginStatus(message || '', false);
     window.setTimeout(function () {
       try { dom.tokenInput.focus(); } catch (e) { /* ignore */ }
@@ -353,6 +356,7 @@
 
   function onLoginSubmit(e) {
     e.preventDefault();
+    if (state.busy.login) { return; }
     var token = trim(dom.tokenInput.value);
     if (!token) {
       setLoginStatus('Enter the admin token.');
@@ -360,11 +364,13 @@
       return;
     }
 
+    state.busy.login = true;
     dom.loginSubmit.disabled = true;
     dom.loginSubmit.textContent = 'Signing in…';
     setLoginStatus('', false);
 
     attemptLogin(token, function (err) {
+      state.busy.login = false;
       dom.loginSubmit.disabled = false;
       dom.loginSubmit.textContent = 'Sign in';
 
@@ -418,6 +424,7 @@
     state.busy = {};
     storageRemove(TOKEN_KEY);
     stopPolling();
+    closeModal();
     setConn('off');
     dom.rememberToken.checked = false;
     showLogin('Your token was rejected. Sign in again.');
@@ -459,6 +466,9 @@
     dom.loginGate.hidden = false;
     dom.tokenInput.value = '';
     dom.rememberToken.checked = false;
+    dom.consoleInput.disabled = false;
+    dom.consoleInput.value = '';
+    dom.broadcastInput.value = '';
     setLoginStatus('', false);
     setConn('off');
     dom.tokenInput.focus();
@@ -483,7 +493,15 @@
       if (err) {
         storageRemove(TOKEN_KEY);
         dom.rememberToken.checked = false;
-        setLoginStatus('The saved token was rejected. Enter it again.');
+        if (err.status === 429) {
+          setLoginStatus('Too many failed attempts. Wait five minutes and try again.');
+        } else if (err.status === 403) {
+          setLoginStatus('This device is not allowed. The panel accepts private addresses only.');
+        } else if (err.status === 0) {
+          setLoginStatus('Cannot reach the admin server. Is DartScape.Web --admin running?');
+        } else {
+          setLoginStatus('The saved token was rejected. Enter it again.');
+        }
         dom.tokenInput.focus();
         return;
       }
@@ -1001,8 +1019,8 @@
       e.preventDefault();
       historyNext();
     } else if (e.keyCode === 13) {
-      /* Handle Enter explicitly so it works even when implicit form
-         submission is unavailable (IME, some mobile keyboards). */
+      /* Submit explicitly: implicit form submission is unreliable on some
+         mobile keyboards and never fires mid-IME composition. */
       e.preventDefault();
       runCommand(dom.consoleInput.value);
     }
@@ -1568,7 +1586,7 @@
       if (e.keyCode !== 13) { return; }
       e.preventDefault();
       if (dom.loginSubmit.disabled) { return; }
-      onLoginSubmit({ preventDefault: function () { /* no-op */ } });
+      onLoginSubmit({ preventDefault: function () { /* handled */ } });
     });
 
     dom.signOutBtn.addEventListener('click', signOut);

@@ -16,6 +16,18 @@
   <title>DartScape Admin</title>
   <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
   <link rel="stylesheet" href="assets/css/app.css?v=1">
+  <!-- Applies the saved theme before first paint so a dark-theme operator
+       never sees a white flash. Kept inline and tiny; app.js re-applies it. -->
+  <script>
+    (function () {
+      try {
+        var t = window.localStorage.getItem('dartscape.admin.theme');
+        if (t === 'dark' || t === 'ice' || t === 'light') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) { /* storage blocked: keep the light default */ }
+    })();
+  </script>
   <noscript>
     <style>
       .login-gate, .app { display: none !important; }

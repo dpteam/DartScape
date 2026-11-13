@@ -188,7 +188,7 @@ namespace DartScape.Game.Data
         {
             try
             {
-                var account = IniConfig.Load(AccountPath(key));
+                var account = IniConfig.Create(AccountPath(key));
                 account.Set("account.name", display);
                 account.Set("account.key", key);
                 account.Set("account.password", PasswordHasher.Hash(password));
@@ -290,7 +290,7 @@ namespace DartScape.Game.Data
                     string path = CharacterPath(player.NameKey);
                     string temporary = path + ".tmp";
 
-                    var file = IniConfig.Load(temporary);
+                    IniConfig file = IniConfig.Create(temporary);
                     file.Set("character.name", player.Name);
                     file.Set("character.key", player.NameKey);
                     file.Set("character.savedAt", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"));

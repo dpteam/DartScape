@@ -18,12 +18,18 @@ namespace DartScape.Tests
         public static int Main(string[] args)
         {
             string cachePath = null;
+            string serverAddress = null;
 
             for (int i = 0; i < args.Length; i++)
             {
                 if (string.Equals(args[i], "--cache", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
                 {
                     cachePath = args[i + 1];
+                    i++;
+                }
+                else if (string.Equals(args[i], "--live", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    serverAddress = args[i + 1];
                     i++;
                 }
             }
@@ -56,6 +62,16 @@ namespace DartScape.Tests
                 {
                     Harness.Section("Cache integration");
                     Console.WriteLine("  SKIP  no --cache path given");
+                }
+
+                if (serverAddress != null)
+                {
+                    LiveServerTests.Run(serverAddress);
+                }
+                else
+                {
+                    Harness.Section("Live server");
+                    Console.WriteLine("  SKIP  no --live address given");
                 }
             }
             finally

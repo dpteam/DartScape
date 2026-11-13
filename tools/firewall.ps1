@@ -47,6 +47,17 @@ if (-not $isAdmin) {
     exit
 }
 
+# From here on we are elevated. Mirror everything to a report file, because the
+# elevated window closes when the script finishes and its output is otherwise lost.
+$reportPath = Join-Path ([System.IO.Path]::GetTempPath()) 'dartscape-firewall.log'
+
+try {
+    Start-Transcript -Path $reportPath -Force | Out-Null
+}
+catch {
+    # Transcripts can be blocked by policy; the console output still works.
+}
+
 # --- read the server configuration -----------------------------------------
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -54,9 +65,10 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $scriptDir '..'))
 
 if ([string]::IsNullOrEmpty($ConfigPath)) {
     $candidates = @(
+        (Join-Path $repoRoot 'config.ini'),
+        (Join-Path $repoRoot 'bin\config.ini'),
         (Join-Path $repoRoot 'artifacts\dist\server\config.ini'),
-        (Join-Path $repoRoot 'src\DartScape.Server\bin\Release\net40\config.ini'),
-        (Join-Path $repoRoot 'config.ini')
+        (Join-Path $repoRoot 'src\DartScape.Server\bin\Release\net40\config.ini')
     )
 
     foreach ($candidate in $candidates) {
@@ -240,3 +252,18 @@ Write-Host '  * enable "Block common exploits" and a websocket upgrade is NOT ne
 Write-Host '  * leave the admin port alone; reach it directly on the LAN'
 Write-Host ''
 Write-Host 'Firewall configuration complete.' -ForegroundColor Green
+
+try {
+    Stop-Transcript | Out-Null
+    Write-Host ''
+    Write-Host ("Report written to {0}" -f $reportPath) -ForegroundColor DarkGray
+}
+catch {
+}
+
+# Keep the elevated window open long enough to read, unless this was a quiet run.
+if ($Host.Name -eq 'ConsoleHost' -and -not $env:DARTSCAPE_NO_PAUSE) {
+    Write-Host ''
+    Write-Host 'Press Enter to close.' -ForegroundColor DarkGray
+    Read-Host | Out-Null
+}

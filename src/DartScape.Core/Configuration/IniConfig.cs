@@ -45,6 +45,21 @@ namespace DartScape.Core.Configuration
         }
 
         /// <summary>
+        /// Creates an empty configuration bound to <paramref name="path"/> without reading
+        /// or writing the file.
+        /// </summary>
+        /// <remarks>
+        /// Used when a caller is about to build a file from scratch: loading first would
+        /// create an empty file on disk and log a misleading "no config, writing defaults"
+        /// message.
+        /// </remarks>
+        public static IniConfig Create(string path)
+        {
+            if (string.IsNullOrEmpty(path)) throw new ArgumentNullException("path");
+            return new IniConfig(System.IO.Path.GetFullPath(path));
+        }
+
+        /// <summary>
         /// Loads <paramref name="path"/>, creating it with the supplied defaults when
         /// it does not exist yet. Never throws for I/O problems — it logs and
         /// continues with defaults, because a game server that refuses to boot

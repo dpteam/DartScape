@@ -61,6 +61,7 @@
 
     view: 'status',
     skill: 'woodcutting',
+    pendingSkill: null,
     hiscoreLoading: false,
     hiscoreLoaded: false,
     newsLoading: false,
@@ -591,7 +592,7 @@
      News
      ------------------------------------------------------------------------ */
 
-  function renderNewsList(items, targetId, limit) {
+  function renderNewsList(items, targetId, limit, linkTitles) {
     var box = byId(targetId);
     if (!box) { return; }
 
@@ -608,8 +609,13 @@
       var meta = esc(fmtClock(item.at));
       if (item.author) { meta += ' <span class="foot-sep">·</span> ' + esc(item.author); }
 
+      var title = esc(item.title || 'Untitled');
+      if (linkTitles) {
+        title = '<a href="#news" data-view="news">' + title + '</a>';
+      }
+
       html += '<article class="news-item">' +
-        '<h3><a href="#news" data-view="news">' + esc(item.title || 'Untitled') + '</a></h3>' +
+        '<h3>' + title + '</h3>' +
         '<p class="news-meta">' + meta + '</p>' +
         '<p class="news-body">' + esc(item.body || '').replace(/\n/g, '<br>') + '</p>' +
         '</article>';
@@ -635,8 +641,8 @@
 
       state.newsLoaded = true;
       var items = data.items || [];
-      renderNewsList(items, 'news-mini', 3);
-      renderNewsList(items, 'news-full', 0);
+      renderNewsList(items, 'news-mini', 3, true);
+      renderNewsList(items, 'news-full', 0, false);
     }, OTHER_TIMEOUT);
   }
 
@@ -681,8 +687,15 @@
   }
 
   function loadHiscore(skill) {
-    if (state.hiscoreLoading) { return; }
+    /* A request is already in flight: remember the newest choice and re-issue
+       when it lands, so quickly switching skills never shows stale rows. */
+    if (state.hiscoreLoading) {
+      state.pendingSkill = skill;
+      setText(byId('hiscore-note'), 'top 25 · ' + skillLabel(skill));
+      return;
+    }
     state.hiscoreLoading = true;
+    state.pendingSkill = null;
     state.skill = skill;
 
     var body = byId('hiscore-body');
@@ -701,11 +714,16 @@
             setHTML(body, '<tr><td colspan="4" class="empty">Hiscores are unavailable right now.</td></tr>');
           }
           if (state.view === 'hiscore') { toast('Hiscores unavailable — try again in a moment.'); }
+          state.pendingSkill = null;
           return;
         }
 
         state.hiscoreLoaded = true;
         renderHiscore(data.entries, skill);
+
+        if (state.pendingSkill && state.pendingSkill !== skill) {
+          loadHiscore(state.pendingSkill);
+        }
       }, OTHER_TIMEOUT);
   }
 

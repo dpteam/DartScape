@@ -61,6 +61,30 @@ which opens exactly the ports the server needs and tells you what to put in
 Nginx Proxy Manager. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the full
 walkthrough, including why the admin port must never be forwarded.
 
+### Developing
+
+```
+build.cmd        # build everything, stage bin\, run the tests
+run.cmd          # start the server from bin\
+run.cmd client   # start the client
+```
+
+`build.cmd` produces a **ready-to-run instance in `bin\`**: assemblies, web
+assets, the 317 cache, `config.ini`, and the `data\`, `logs\` and `keys\`
+folders. That folder *is* the development world — start it, play in it, keep the
+characters between builds.
+
+A rebuild never touches `config.ini`, `data\`, `keys\` or `logs\`, so the local
+world survives. The whole `bin\` tree is gitignored: binaries, the cache copy and
+the live world never enter the repository. Only `config.example.ini` is
+committed, as the documented template.
+
+```powershell
+build.cmd -Clean        # wipe bin\ build output, keep the world
+build.cmd -DebugBuild   # debug build
+build.cmd -SkipTests    # build only
+```
+
 ## Architecture
 
 ```
@@ -149,15 +173,24 @@ instead of being left for you to discover.
 ## Repository layout
 
 ```
+bin/            the live development instance (gitignored)
 src/            the seven assemblies
 tests/          the test runner
 tools/          build checks, packaging, firewall, icon generation
 docs/           architecture, deployment, pipeline, web API
 assets/         logo, icons, and the 317 cache
+config.example.ini   documented config template
+build.cmd       build everything and stage bin\
+run.cmd         start the server, client or launcher from bin\
 ```
 
 `refs/` holds the upstream reference implementations that were studied to build
 this; it is excluded from version control and from every package.
+
+`bin/` is the working world. It holds binaries, a cache copy, `config.ini` with
+the admin token, the RSA key, and every account and character. None of it is in
+git — which is the point: a `git clean -xdf` cannot delete your test world,
+because it was never tracked in the first place.
 
 ## Licence and attribution
 
