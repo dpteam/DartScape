@@ -1,15 +1,15 @@
-/* ==========================================================================
-   DartScape — public status site behaviour
+﻿/* ==========================================================================
+   DartScape вЂ” public status site behaviour
    ES5 only. No frameworks, no build step, no fetch/Promise.
 
    Responsibilities
-     * API.get()      — XMLHttpRequest + timeout + JSON guard
-     * polling        — api/status every 2s when healthy, backing off to 15s
-     * rendering      — every panel, with all server strings escaped
-     * events         — append-only, driven by the monotonic `seq`
-     * views          — Status / Hiscores / News in one page
-     * theme          — light | dark | oled, persisted in localStorage
-     * toast + copy   — small quality-of-life helpers
+     * API.get()      вЂ” XMLHttpRequest + timeout + JSON guard
+     * polling        вЂ” api/status every 2s when healthy, backing off to 15s
+     * rendering      вЂ” every panel, with all server strings escaped
+     * events         вЂ” append-only, driven by the monotonic `seq`
+     * views          вЂ” Status / Hiscores / News in one page
+     * theme          вЂ” light | dark | oled, persisted in localStorage
+     * toast + copy   вЂ” small quality-of-life helpers
 
    Contract: docs/WEB-API.md. Every request path is relative so the site keeps
    working when it is mounted under a sub-path.
@@ -31,7 +31,9 @@
 
   var THEME_KEY = 'dartscape.theme';
   var THEMES = ['light', 'dark', 'oled'];
-  var THEME_COLORS = { light: '#45688e', dark: '#22374f', oled: '#000000' };
+  var THEME_COLORS = {
+    light: '#45688e', dark: '#22374f', oled: '#000000'
+  };
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -135,7 +137,7 @@
 
   function fmtInt(value) {
     var n = toNum(value);
-    if (n === null) { return '—'; }
+    if (n === null) { return 'вЂ”'; }
     return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
@@ -143,10 +145,10 @@
     return n < 10 ? '0' + n : String(n);
   }
 
-  /* "13 Nov, 10:12" — deterministic, no locale dependence. */
+  /* "13 Nov, 10:12" вЂ” deterministic, no locale dependence. */
   function fmtClock(unixSec) {
     var s = toNum(unixSec);
-    if (s === null || s <= 0) { return '—'; }
+    if (s === null || s <= 0) { return 'вЂ”'; }
     var d = new Date(s * 1000);
     return d.getDate() + ' ' + MONTHS[d.getMonth()] + ', ' +
       pad2(d.getHours()) + ':' + pad2(d.getMinutes());
@@ -155,7 +157,7 @@
   /* "42s", "18m", "3h 34m", "2d 4h" */
   function fmtUptime(seconds) {
     var s = toNum(seconds);
-    if (s === null || s < 0) { return '—'; }
+    if (s === null || s < 0) { return 'вЂ”'; }
     s = Math.floor(s);
     var d = Math.floor(s / 86400);
     var h = Math.floor((s % 86400) / 3600);
@@ -168,7 +170,7 @@
 
   function fmtDecimal(value, places) {
     var n = toNum(value);
-    if (n === null) { return '—'; }
+    if (n === null) { return 'вЂ”'; }
     return n.toFixed(places);
   }
 
@@ -191,7 +193,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     API — XMLHttpRequest wrapper
+     API вЂ” XMLHttpRequest wrapper
      ------------------------------------------------------------------------ */
 
   var API = {
@@ -256,7 +258,7 @@
   };
 
   /* ------------------------------------------------------------------------
-     Toast — a single reusable element, so only one is ever visible
+     Toast вЂ” a single reusable element, so only one is ever visible
      ------------------------------------------------------------------------ */
 
   function toast(message) {
@@ -333,10 +335,10 @@
       pill.title = 'The world is accepting connections.';
     } else if (mode === 'offline') {
       setText(byId('conn-text'), 'Offline');
-      pill.title = 'The status API is not answering. Retrying…';
+      pill.title = 'The status API is not answering. RetryingвЂ¦';
     } else {
-      setText(byId('conn-text'), 'Connecting…');
-      pill.title = 'Checking the world…';
+      setText(byId('conn-text'), 'ConnectingвЂ¦');
+      pill.title = 'Checking the worldвЂ¦';
     }
   }
 
@@ -352,7 +354,7 @@
     var online = toNum(world.playersOnline);
     var max = toNum(world.playersMax);
 
-    setText(byId('stat-players'), online === null ? '—' : fmtInt(online));
+    setText(byId('stat-players'), online === null ? 'вЂ”' : fmtInt(online));
     setText(byId('stat-players-note'),
       max ? 'of ' + fmtInt(max) + ' slots' : 'on the world');
 
@@ -365,7 +367,7 @@
 
     var tps = toNum(world.ticksPerSecond);
     var tickMs = toNum(world.averageTickMs);
-    setText(byId('stat-tick'), tps === null ? '—' : fmtDecimal(tps, 2) + ' tps');
+    setText(byId('stat-tick'), tps === null ? 'вЂ”' : fmtDecimal(tps, 2) + ' tps');
     setText(byId('stat-tick-note'),
       tickMs === null || tickMs <= 0
         ? 'game loop speed'
@@ -391,7 +393,7 @@
       ? '<span class="tag tag--muted">' + esc(world.region) + '</span>'
       : '';
 
-    var version = esc(data.version || '—');
+    var version = esc(data.version || 'вЂ”');
     if (data.revision !== null && data.revision !== undefined) {
       version += ' <span class="muted">rev ' + esc(data.revision) + '</span>';
     }
@@ -479,7 +481,7 @@
   }
 
   /* ------------------------------------------------------------------------
-     World events — append only, keyed on the monotonic `seq`
+     World events вЂ” append only, keyed on the monotonic `seq`
      ------------------------------------------------------------------------ */
 
   function clearEventPlaceholders(list) {
@@ -610,7 +612,7 @@
     for (var i = 0; i < count; i++) {
       var item = items[i] || {};
       var meta = esc(fmtClock(item.at));
-      if (item.author) { meta += ' <span class="foot-sep">·</span> ' + esc(item.author); }
+      if (item.author) { meta += ' <span class="foot-sep">В·</span> ' + esc(item.author); }
 
       var title = esc(item.title || 'Untitled');
       if (linkTitles) {
@@ -669,7 +671,7 @@
 
     entries = entries || [];
     if (!entries.length) {
-      setHTML(body, '<tr><td colspan="4" class="empty">No entries yet — nobody has trained ' +
+      setHTML(body, '<tr><td colspan="4" class="empty">No entries yet вЂ” nobody has trained ' +
         esc(skillLabel(skill)) + '.</td></tr>');
       return;
     }
@@ -694,7 +696,7 @@
        when it lands, so quickly switching skills never shows stale rows. */
     if (state.hiscoreLoading) {
       state.pendingSkill = skill;
-      setText(byId('hiscore-note'), 'top 25 · ' + skillLabel(skill));
+      setText(byId('hiscore-note'), 'top 25 В· ' + skillLabel(skill));
       return;
     }
     state.hiscoreLoading = true;
@@ -703,9 +705,9 @@
 
     var body = byId('hiscore-body');
     if (body && !state.hiscoreLoaded) {
-      setHTML(body, '<tr><td colspan="4" class="empty">Loading hiscores…</td></tr>');
+      setHTML(body, '<tr><td colspan="4" class="empty">Loading hiscoresвЂ¦</td></tr>');
     }
-    setText(byId('hiscore-note'), 'top 25 · ' + skillLabel(skill));
+    setText(byId('hiscore-note'), 'top 25 В· ' + skillLabel(skill));
 
     API.get(bust('api/hiscore?skill=' + encodeURIComponent(skill) + '&limit=25'),
       function (err, data) {
@@ -716,7 +718,7 @@
           if (!state.hiscoreLoaded) {
             setHTML(body, '<tr><td colspan="4" class="empty">Hiscores are unavailable right now.</td></tr>');
           }
-          if (state.view === 'hiscore') { toast('Hiscores unavailable — try again in a moment.'); }
+          if (state.view === 'hiscore') { toast('Hiscores unavailable вЂ” try again in a moment.'); }
           state.pendingSkill = null;
           return;
         }
@@ -796,7 +798,7 @@
       if (ok) {
         toast('Copied ' + text + ' to the clipboard.');
       } else {
-        toast('Could not copy — the address is ' + text + '.');
+        toast('Could not copy вЂ” the address is ' + text + '.');
       }
     });
   }
@@ -855,10 +857,10 @@
     renderSkills(data.skillTotals);
 
     setText(byId('about-logins'), fmtInt(data.logins24h));
-    setText(byId('about-rev'), data.revision === null || data.revision === undefined ? '—' : String(data.revision));
-    setText(byId('foot-version'), 'v' + (data.version || '—'));
+    setText(byId('about-rev'), data.revision === null || data.revision === undefined ? 'вЂ”' : String(data.revision));
+    setText(byId('foot-version'), 'v' + (data.version || 'вЂ”'));
     setText(byId('foot-rev'), 'revision ' +
-      (data.revision === null || data.revision === undefined ? '—' : data.revision));
+      (data.revision === null || data.revision === undefined ? 'вЂ”' : data.revision));
   }
 
   /* ------------------------------------------------------------------------
@@ -907,7 +909,7 @@
         setText(byId('server-note'), 'reconnecting');
         if (!state.errorShown) {
           state.errorShown = true;
-          toast('Status unavailable — retrying…');
+          toast('Status unavailable вЂ” retryingвЂ¦');
         }
       } else {
         state.fails = 0;

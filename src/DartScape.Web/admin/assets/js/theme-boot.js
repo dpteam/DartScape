@@ -1,4 +1,4 @@
-﻿/* ---------------------------------------------------------------------------
+/* ---------------------------------------------------------------------------
    Admin theme bootstrap.
 
    Runs synchronously in <head> so an operator who prefers the dark theme never

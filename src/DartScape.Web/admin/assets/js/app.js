@@ -1,5 +1,5 @@
-﻿/* ============================================================================
- * DartScape Admin вЂ” assets/js/app.js
+/* ============================================================================
+ * DartScape Admin — assets/js/app.js
  * Role: all client behaviour for the LAN-only admin panel. Talks to the admin
  * API exactly as documented in docs/WEB-API.md using XMLHttpRequest and the
  * `Authorization: Bearer <token>` header. ES5 only, no frameworks, no build.
@@ -92,26 +92,26 @@
   }
 
   function fmtClock(unixSec) {
-    if (!unixSec) { return 'вЂ”'; }
+    if (!unixSec) { return '—'; }
     var d = new Date(unixSec * 1000);
     return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
   }
 
   function fmtDateTime(unixSec) {
-    if (!unixSec) { return 'вЂ”'; }
+    if (!unixSec) { return '—'; }
     var d = new Date(unixSec * 1000);
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
       ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
   function fmtDate(unixSec) {
-    if (!unixSec) { return 'вЂ”'; }
+    if (!unixSec) { return '—'; }
     var d = new Date(unixSec * 1000);
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
 
   function fmtDuration(sec) {
-    if (sec === null || sec === undefined || isNaN(sec)) { return 'вЂ”'; }
+    if (sec === null || sec === undefined || isNaN(sec)) { return '—'; }
     sec = Math.max(0, Math.floor(Number(sec)));
     var d = Math.floor(sec / 86400);
     var h = Math.floor((sec % 86400) / 3600);
@@ -124,7 +124,7 @@
   }
 
   function fmtIdle(sec) {
-    if (sec === null || sec === undefined || isNaN(sec)) { return 'вЂ”'; }
+    if (sec === null || sec === undefined || isNaN(sec)) { return '—'; }
     sec = Math.max(0, Math.floor(Number(sec)));
     if (sec < 60) { return sec + 's'; }
     if (sec < 3600) { return Math.floor(sec / 60) + 'm ' + (sec % 60) + 's'; }
@@ -132,7 +132,7 @@
   }
 
   function fmtNum(value) {
-    if (value === null || value === undefined || value === '') { return 'вЂ”'; }
+    if (value === null || value === undefined || value === '') { return '—'; }
     var num = Number(value);
     if (isNaN(num)) { return String(value); }
     var negative = num < 0;
@@ -142,13 +142,13 @@
   }
 
   function fmtFixed(value, places) {
-    if (typeof value !== 'number' || isNaN(value)) { return 'вЂ”'; }
+    if (typeof value !== 'number' || isNaN(value)) { return '—'; }
     return value.toFixed(places);
   }
 
   function setText(el, value) {
     if (!el) { return; }
-    el.textContent = (value === null || value === undefined) ? 'вЂ”' : String(value);
+    el.textContent = (value === null || value === undefined) ? '—' : String(value);
   }
 
   function addClass(el, cls) {
@@ -246,10 +246,14 @@
           return;
         }
 
+        /* Some endpoints report a soft failure (HTTP 200, ok:false) together
+           with useful output — e.g. a command that was not recognised. Keep
+           that payload on the error so the caller can still render it. */
         finish({
           status: xhr.status,
           error: data.error || 'http-' + xhr.status,
-          message: data.message || 'The server refused the request.'
+          message: data.message || '',
+          data: data
         });
       };
 
@@ -266,6 +270,15 @@
   };
 
   /* Central error handling: 401 always drops back to the login gate. */
+  function describeError(err) {
+    if (err.message) { return err.message; }
+    if (err.status === 0) { return 'Cannot reach the admin server.'; }
+    if (err.status === 403) { return 'Forbidden — this panel accepts private addresses only.'; }
+    if (err.status === 404) { return 'Not found (' + (err.error || 'not-found') + ').'; }
+    if (err.status === 429) { return 'Too many attempts. Wait five minutes.'; }
+    return 'Request failed (' + (err.error || ('HTTP ' + err.status)) + ').';
+  }
+
   function handleApiError(err, opts) {
     if (err.status === 401 && !opts.noAuthGate) {
       onAuthError();
@@ -277,7 +290,7 @@
       setConn('err');
     }
     if (!opts.silent) {
-      toast('error', err.message || 'Request failed.');
+      toast('error', describeError(err));
     }
     return false;
   }
@@ -366,7 +379,7 @@
 
     state.busy.login = true;
     dom.loginSubmit.disabled = true;
-    dom.loginSubmit.textContent = 'Signing inвЂ¦';
+    dom.loginSubmit.textContent = 'Signing in…';
     setLoginStatus('', false);
 
     attemptLogin(token, function (err) {
@@ -428,7 +441,7 @@
     setConn('off');
     dom.rememberToken.checked = false;
     showLogin('Your token was rejected. Sign in again.');
-    toast('error', 'Session expired вЂ” sign in again.');
+    toast('error', 'Session expired — sign in again.');
   }
 
   function signOut() {
@@ -456,8 +469,8 @@
     dom.configSearch.value = '';
     state.playerFilter = '';
     dom.logCount.textContent = '0 lines';
-    dom.logStatus.textContent = 'ConnectingвЂ¦';
-    dom.configMeta.textContent = 'Read-only В· secrets redacted';
+    dom.logStatus.textContent = 'Connecting…';
+    dom.configMeta.textContent = 'Read-only · secrets redacted';
     dom.overviewUpdated.textContent = 'Waiting for data';
     dom.navPlayerCount.hidden = true;
     resetOverview();
@@ -483,8 +496,8 @@
 
     dom.rememberToken.checked = true;
     dom.loginSubmit.disabled = true;
-    dom.loginSubmit.textContent = 'CheckingвЂ¦';
-    setLoginStatus('Checking saved tokenвЂ¦', true);
+    dom.loginSubmit.textContent = 'Checking…';
+    setLoginStatus('Checking saved token…', true);
 
     attemptLogin(saved, function (err) {
       dom.loginSubmit.disabled = false;
@@ -633,7 +646,7 @@
     var proc = data.process || {};
 
     setText(dom.ovUptime, fmtDuration(server.uptimeSec));
-    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDate(proc.startedAt) : 'since вЂ”');
+    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDate(proc.startedAt) : 'since —');
     setText(dom.ovPlayers, fmtNum(world.playersOnline) + ' / ' + fmtNum(world.playersMax));
     setText(dom.ovAccountsStat, fmtNum(world.accountsTotal) + ' accounts');
     setText(dom.ovTickRate, fmtFixed(server.tickRate, 2));
@@ -642,9 +655,9 @@
     setText(dom.ovThreads, fmtNum(server.threads));
     setText(dom.ovRestarts, fmtNum(proc.restarts));
 
-    setText(dom.ovPid, (proc.pid === null || proc.pid === undefined) ? 'вЂ”' : proc.pid);
+    setText(dom.ovPid, (proc.pid === null || proc.pid === undefined) ? '—' : proc.pid);
     setText(dom.ovStartedAt, fmtDateTime(proc.startedAt));
-    setText(dom.ovLogFile, proc.logFile || 'вЂ”');
+    setText(dom.ovLogFile, proc.logFile || '—');
     setText(dom.ovGc, fmtNum(server.gcCollections));
     setText(dom.ovNpcs, fmtNum(world.npcs));
     setText(dom.ovGround, fmtNum(world.groundItems));
@@ -684,11 +697,11 @@
       'ovThreads', 'ovRestarts', 'ovPid', 'ovStartedAt', 'ovGc', 'ovNpcs',
       'ovGround', 'ovAccounts'];
     for (var i = 0; i < ids.length; i++) {
-      setText(dom[ids[i]], 'вЂ”');
+      setText(dom[ids[i]], '—');
     }
-    setText(dom.ovStarted, 'since вЂ”');
-    setText(dom.ovAccountsStat, 'вЂ” accounts');
-    setText(dom.ovLogFile, 'вЂ”');
+    setText(dom.ovStarted, 'since —');
+    setText(dom.ovAccountsStat, '— accounts');
+    setText(dom.ovLogFile, '—');
     dom.ovLastError.textContent = 'None recorded.';
     removeClass(dom.ovLastError, 'has-error');
     dom.ovServerState.textContent = 'Unknown';
@@ -738,7 +751,7 @@
       dom.playersEmpty.hidden = false;
       dom.playersEmpty.textContent = all.length === 0
         ? 'No players online.'
-        : 'No players match вЂњ' + raw + 'вЂќ.';
+        : 'No players match “' + raw + '”.';
     } else {
       dom.playersEmpty.hidden = true;
     }
@@ -751,7 +764,7 @@
     var tdName = document.createElement('td');
     tdName.className = 'cell-name';
     tdName.appendChild(document.createTextNode(
-      p.name === null || p.name === undefined ? 'вЂ”' : String(p.name)
+      p.name === null || p.name === undefined ? '—' : String(p.name)
     ));
 
     var priv = Number(p.privilege || 0);
@@ -766,14 +779,14 @@
     tr.appendChild(tdCell(fmtNum(p.combat), 'cell-num', 'Combat'));
     tr.appendChild(tdCell(fmtNum(p.totalLevel), 'cell-num', 'Level'));
 
-    var pos = 'вЂ”';
+    var pos = '—';
     if (p.x !== null && p.x !== undefined && p.y !== null && p.y !== undefined) {
-      pos = p.x + ', ' + p.y + (p.plane ? ' В· P' + p.plane : '');
+      pos = p.x + ', ' + p.y + (p.plane ? ' · P' + p.plane : '');
     }
     tr.appendChild(tdCell(pos, 'cell-mono', 'Pos'));
 
     tr.appendChild(tdCell(fmtDuration(p.sessionSec), 'cell-num', 'Session'));
-    tr.appendChild(tdCell(p.address || 'вЂ”', 'cell-mono', 'Addr'));
+    tr.appendChild(tdCell(p.address || '—', 'cell-mono', 'Addr'));
     tr.appendChild(tdCell(fmtIdle(p.idleSec), 'cell-num', 'Idle'));
 
     var tdActions = document.createElement('td');
@@ -847,7 +860,7 @@
 
     var intro = document.createElement('p');
     intro.className = 'modal-text';
-    intro.textContent = 'Send a private message to ' + name + '.';
+    intro.textContent = 'Deliver a message to ' + name + ' through world chat.';
 
     var label = document.createElement('label');
     label.className = 'field-label';
@@ -859,7 +872,7 @@
     input.className = 'input';
     input.rows = 3;
     input.maxLength = 240;
-    input.placeholder = 'HelloвЂ¦';
+    input.placeholder = 'Hello…';
     input.addEventListener('keydown', function (e) {
       if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
         e.preventDefault();
@@ -869,8 +882,8 @@
 
     var hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = 'Sent through the command dispatcher as вЂњ::msg ' + name +
-      ' <text>вЂќ, so the reply appears in the Console tab.';
+    hint.textContent = 'No private-message command exists, so this is sent as ' +
+      '"::broadcast To <name>: <text>" - every online player sees it.';
 
     wrap.appendChild(intro);
     wrap.appendChild(label);
@@ -880,7 +893,7 @@
     openModal({
       title: 'Message ' + name,
       body: wrap,
-      confirmLabel: 'Send',
+      confirmLabel: 'Send message',
       focus: input,
       onConfirm: function (done) {
         var text = trim(input.value);
@@ -890,7 +903,7 @@
           input.focus();
           return;
         }
-        var command = '::msg ' + name + ' ' + text;
+        var command = '::broadcast To ' + name + ': ' + text;
         apiPost('api/admin/command', { text: command }, function (err, data) {
           done();
           if (err) {
@@ -905,7 +918,7 @@
           } else {
             appendConsole('sys', '(no output)');
           }
-          toast('success', 'Message sent to ' + name + '.');
+          toast('success', 'Message sent for ' + name + '.');
         });
       }
     });
@@ -991,7 +1004,16 @@
       dom.consoleInput.focus();
 
       if (err) {
-        appendConsole('err', err.message || 'Command failed.');
+        /* A rejected command still carries the dispatcher's explanation in
+           `output` (HTTP 200, ok:false). Show that instead of a generic line. */
+        var reason = err.data && err.data.output;
+        if (reason && reason.length) {
+          for (var r = 0; r < reason.length; r++) {
+            appendConsole('err', reason[r]);
+          }
+        } else {
+          appendConsole('err', describeError(err));
+        }
         return;
       }
 
@@ -1036,7 +1058,7 @@
 
     openConfirm({
       title: 'Broadcast to all players?',
-      message: 'вЂњ' + text + 'вЂќ will appear in every online playerвЂ™s chat.',
+      message: '“' + text + '” will appear in every online player’s chat.',
       confirmLabel: 'Send broadcast',
       onConfirm: function (done) {
         apiPost('api/admin/broadcast', { text: text }, function (err, data) {
@@ -1157,7 +1179,7 @@
       state.busy.logs = false;
 
       if (err) {
-        dom.logStatus.textContent = 'Paused вЂ” last request failed';
+        dom.logStatus.textContent = 'Paused — last request failed';
         return;
       }
 
@@ -1320,12 +1342,12 @@
       dom.configEmpty.hidden = false;
       dom.configEmpty.textContent = sections.length === 0
         ? 'No configuration entries.'
-        : 'No entries match вЂњ' + raw + 'вЂќ.';
+        : 'No entries match “' + raw + '”.';
     } else {
       dom.configEmpty.hidden = true;
     }
 
-    dom.configMeta.textContent = 'Read-only В· secrets redacted В· ' + shownEntries +
+    dom.configMeta.textContent = 'Read-only · secrets redacted · ' + shownEntries +
       (shownEntries === 1 ? ' entry' : ' entries');
   }
 
@@ -1454,7 +1476,7 @@
     var mark = document.createElement('span');
     mark.className = 'toast-mark';
     mark.setAttribute('aria-hidden', 'true');
-    mark.textContent = kind === 'success' ? 'вњ“' : '!';
+    mark.textContent = kind === 'success' ? '✓' : '!';
 
     var body = document.createElement('span');
     body.className = 'toast-text';

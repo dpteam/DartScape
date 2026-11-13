@@ -65,7 +65,7 @@ var Launcher = (function () {
 
     if (name === 'ping') {
       var result = parseJson(payload);
-      showPing(result && result.ok, result && result.ms);
+      showPing(result && result.ok, result && result.ms, result && result.why, result && result.via);
       return;
     }
 
@@ -131,17 +131,23 @@ var Launcher = (function () {
       .replace(/"/g, '&quot;');
   }
 
-  function showPing(ok, ms) {
+  function showPing(ok, ms, why, via) {
     var pill = $('pingPill');
     if (!pill) return;
 
     if (ok && ms > 0) {
       pill.className = 'pill ok';
       pill.innerHTML = 'online &middot; ' + ms + ' ms';
-    } else {
-      pill.className = 'pill bad';
-      pill.innerHTML = 'unreachable';
+      setStatus(via ? ('Reached ' + via + '.') : 'Server is reachable.', false);
+      return;
     }
+
+    pill.className = 'pill bad';
+    pill.innerHTML = 'unreachable';
+
+    // The host explains which of the two likely causes it is; repeating "unreachable"
+    // here would leave the user with nothing to act on.
+    setStatus(why || 'The server did not answer. Is it running, and is the port forwarded?', true);
   }
 
   /* ------------------------------------------------------------------ tabs */

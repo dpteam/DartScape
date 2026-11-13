@@ -26,7 +26,8 @@ param(
     [string]$Configuration = 'Release',
     [switch]$DebugBuild,
     [switch]$SkipTests,
-    [switch]$Clean
+    [switch]$Clean,
+    [switch]$StopRunning
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +50,52 @@ function Write-Ok([string]$text) {
 Write-Host 'DartScape build'
 Write-Host ("  configuration : {0}" -f $Configuration)
 Write-Host ("  output        : {0}" -f $binDir)
+
+# --- guard against a running instance --------------------------------------
+
+# Staging copies over the assemblies in bin\, and a running server holds them open.
+# Failing with "file in use" halfway through leaves a half-updated folder, which is
+# far worse than refusing to start, so check first and say what to do.
+$running = @()
+
+foreach ($name in @('DartScape.Server', 'DartScape.Client', 'DartScape.Launcher')) {
+    $process = Get-Process -Name $name -ErrorAction SilentlyContinue
+    if ($process) { $running += $process }
+}
+
+if ($running.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'DartScape is running, so bin\ cannot be updated:' -ForegroundColor Yellow
+
+    foreach ($process in $running) {
+        Write-Host ("    {0} (pid {1})" -f $process.ProcessName, $process.Id) -ForegroundColor Yellow
+    }
+
+    Write-Host ''
+    Write-Host '  Close it and run build again, or use -StopRunning to let the build do it.'
+    Write-Host '  Characters are saved on a clean shutdown; -StopRunning kills the process.'
+    Write-Host ''
+
+    if (-not $StopRunning) {
+        exit 1
+    }
+
+    foreach ($process in $running) {
+        Write-Host ("    stopping {0} (pid {1})" -f $process.ProcessName, $process.Id) -ForegroundColor Yellow
+        try { $process.CloseMainWindow() | Out-Null } catch { }
+    }
+
+    # Give a graceful close a moment, then insist.
+    Start-Sleep -Seconds 3
+
+    foreach ($process in $running) {
+        if (-not $process.HasExited) {
+            try { $process.Kill(); $process.WaitForExit(5000) } catch { }
+        }
+    }
+
+    Start-Sleep -Seconds 1
+}
 
 # --- clean -----------------------------------------------------------------
 

@@ -1,6 +1,6 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--
-  DartScape Admin вЂ” index.html
+  DartScape Admin — index.html
   Role: shell for the LAN-only admin panel (port 43596). Contains the token
   login gate, the authenticated layout (top bar, sidebar, five sections), the
   shared dialog and toast hosts. All behaviour lives in assets/js/app.js; all
@@ -36,7 +36,7 @@
 </noscript>
 
 <!-- ============================================================
-     LOGIN GATE вЂ” shown until a token is verified
+     LOGIN GATE — shown until a token is verified
      ============================================================ -->
 <div class="login-gate" id="loginGate">
   <form class="login-card" id="loginForm" novalidate autocomplete="off">
@@ -68,12 +68,12 @@
     <button class="btn btn-primary btn-block" type="submit" id="loginSubmit">Sign in</button>
 
     <p class="form-error" id="loginError" role="alert" aria-live="polite"></p>
-    <p class="login-foot">LAN only вЂ” never expose port 43596 to the internet.</p>
+    <p class="login-foot">LAN only — never expose port 43596 to the internet.</p>
   </form>
 </div>
 
 <!-- ============================================================
-     APPLICATION SHELL вЂ” revealed after authentication
+     APPLICATION SHELL — revealed after authentication
      ============================================================ -->
 <div class="app" id="app" hidden>
 
@@ -192,37 +192,37 @@
         <div class="stats" id="overviewStats">
           <div class="stat">
             <span class="stat-label">Uptime</span>
-            <span class="stat-value" id="ovUptime">вЂ”</span>
-            <span class="stat-sub" id="ovStarted">since вЂ”</span>
+            <span class="stat-value" id="ovUptime">—</span>
+            <span class="stat-sub" id="ovStarted">since —</span>
           </div>
           <div class="stat">
             <span class="stat-label">Players</span>
-            <span class="stat-value" id="ovPlayers">вЂ”</span>
-            <span class="stat-sub" id="ovAccountsStat">вЂ” accounts</span>
+            <span class="stat-value" id="ovPlayers">—</span>
+            <span class="stat-sub" id="ovAccountsStat">— accounts</span>
           </div>
           <div class="stat">
             <span class="stat-label">Tick rate</span>
-            <span class="stat-value" id="ovTickRate">вЂ”</span>
+            <span class="stat-value" id="ovTickRate">—</span>
             <span class="stat-sub">ticks / second</span>
           </div>
           <div class="stat">
             <span class="stat-label">Avg tick</span>
-            <span class="stat-value" id="ovTickMs">вЂ”</span>
+            <span class="stat-value" id="ovTickMs">—</span>
             <span class="stat-sub">milliseconds</span>
           </div>
           <div class="stat">
             <span class="stat-label">Memory</span>
-            <span class="stat-value" id="ovMemory">вЂ”</span>
+            <span class="stat-value" id="ovMemory">—</span>
             <span class="stat-sub">heap used</span>
           </div>
           <div class="stat">
             <span class="stat-label">Threads</span>
-            <span class="stat-value" id="ovThreads">вЂ”</span>
+            <span class="stat-value" id="ovThreads">—</span>
             <span class="stat-sub">live</span>
           </div>
           <div class="stat">
             <span class="stat-label">Restarts</span>
-            <span class="stat-value" id="ovRestarts">вЂ”</span>
+            <span class="stat-value" id="ovRestarts">—</span>
             <span class="stat-sub">this process</span>
           </div>
         </div>
@@ -234,13 +234,13 @@
           </div>
           <div class="panel-body">
             <dl class="kv">
-              <div class="kv-row"><dt>PID</dt><dd id="ovPid">вЂ”</dd></div>
-              <div class="kv-row"><dt>Started</dt><dd id="ovStartedAt">вЂ”</dd></div>
-              <div class="kv-row kv-row--wide"><dt>Log file</dt><dd class="mono" id="ovLogFile">вЂ”</dd></div>
-              <div class="kv-row"><dt>GC collections</dt><dd id="ovGc">вЂ”</dd></div>
-              <div class="kv-row"><dt>NPCs</dt><dd id="ovNpcs">вЂ”</dd></div>
-              <div class="kv-row"><dt>Ground items</dt><dd id="ovGround">вЂ”</dd></div>
-              <div class="kv-row"><dt>Accounts</dt><dd id="ovAccounts">вЂ”</dd></div>
+              <div class="kv-row"><dt>PID</dt><dd id="ovPid">—</dd></div>
+              <div class="kv-row"><dt>Started</dt><dd id="ovStartedAt">—</dd></div>
+              <div class="kv-row kv-row--wide"><dt>Log file</dt><dd class="mono" id="ovLogFile">—</dd></div>
+              <div class="kv-row"><dt>GC collections</dt><dd id="ovGc">—</dd></div>
+              <div class="kv-row"><dt>NPCs</dt><dd id="ovNpcs">—</dd></div>
+              <div class="kv-row"><dt>Ground items</dt><dd id="ovGround">—</dd></div>
+              <div class="kv-row"><dt>Accounts</dt><dd id="ovAccounts">—</dd></div>
             </dl>
 
             <h4 class="subhead">Last error</h4>
@@ -349,7 +349,7 @@
 
         <div class="logfoot">
           <span id="logCount">0 lines</span>
-          <span id="logStatus">ConnectingвЂ¦</span>
+          <span id="logStatus">Connecting…</span>
         </div>
       </section>
 
@@ -361,7 +361,7 @@
         <div class="section-head">
           <h2>Config</h2>
           <div class="section-actions">
-            <span class="muted small" id="configMeta">Read-only В· secrets redacted</span>
+            <span class="muted small" id="configMeta">Read-only · secrets redacted</span>
             <input type="search" class="input input-search" id="configSearch"
                    placeholder="Search keys and values" aria-label="Search configuration">
             <button type="button" class="btn btn-sm" id="configRefresh">Reload</button>

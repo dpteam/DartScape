@@ -317,6 +317,9 @@ html[data-theme="dark"] {
   --selection-fg: #f0f5fa;
 }
 
+/* Ice: cool cyan and frosted white. The top bar is a light, cold cyan rather
+   than the deep blue of the default, so the three themes are distinguishable at
+
 /* OLED: true black. Panels are #000 so an OLED panel switches those pixels off
    entirely, which is the whole point of the theme. Contrast is deliberately
    raised relative to the dark theme, because pure black next to mid-grey text

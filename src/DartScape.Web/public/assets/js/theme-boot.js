@@ -1,4 +1,4 @@
-/* ---------------------------------------------------------------------------
+﻿/* ---------------------------------------------------------------------------
    Theme bootstrap.
 
    Loaded synchronously in <head>, before the body is parsed, so the stored
@@ -14,7 +14,9 @@
 
 (function () {
   var THEMES = ['light', 'dark', 'oled'];
-  var COLOURS = { light: '#45688e', dark: '#22374f', oled: '#000000' };
+  var COLOURS = {
+    light: '#45688e', dark: '#22374f', oled: '#000000'
+  };
 
   var theme;
 

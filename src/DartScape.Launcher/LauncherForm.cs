@@ -474,22 +474,46 @@ namespace DartScape.Launcher
             int port;
             if (!LauncherSettings.SplitAddress(serverText, out host, out port))
             {
-                Send("ping", "{\"ok\":false,\"ms\":0}");
+                Send("ping", "{\"ok\":false,\"ms\":0,\"why\":\"That address is not valid. Use host:port.\"}");
                 return;
             }
 
-            // Use the same fallback the Play button uses, so a LAN player never sees
-            // "unreachable" for a server that is in fact running next to them.
+            // Try the configured address, then loopback: the launcher may be running on
+            // the same machine as the server, where the public name does not hairpin.
             string reachableHost;
             int reachablePort;
-            TryResolveReachable(host, port, out reachableHost, out reachablePort);
+            bool found = TryResolveReachable(host, port, out reachableHost, out reachablePort);
 
             var stopwatch = Stopwatch.StartNew();
-            bool ok = CanConnect(reachableHost, reachablePort);
+            bool ok = found && CanConnect(reachableHost, reachablePort);
             stopwatch.Stop();
 
-            Send("ping", string.Format(CultureInfo.InvariantCulture,
-                "{{\"ok\":{0},\"ms\":{1}}}", ok ? "true" : "false", ok ? stopwatch.ElapsedMilliseconds : 0));
+            string why = null;
+
+            if (!ok)
+            {
+                // Say which of the two likely causes it is, because "unreachable" tells
+                // nobody anything useful.
+                if (CanConnect("127.0.0.1", port))
+                {
+                    why = "The server is running on this machine but " + host +
+                          " does not answer. Use 127.0.0.1:" + port + " or the LAN address.";
+                }
+                else
+                {
+                    why = "Nothing is listening on " + host + ":" + port +
+                          ". Start DartScape.Server.exe, and make sure the port is forwarded.";
+                }
+            }
+
+            var json = new StringBuilder(160);
+            json.Append("{\"ok\":").Append(ok ? "true" : "false");
+            json.Append(",\"ms\":").Append(ok ? stopwatch.ElapsedMilliseconds : 0);
+            json.Append(",\"via\":").Append(JsonQuote(reachableHost + ":" + reachablePort));
+            if (why != null) json.Append(",\"why\":").Append(JsonQuote(why));
+            json.Append('}');
+
+            Send("ping", json.ToString());
         }
 
         private void OnWorlds()
