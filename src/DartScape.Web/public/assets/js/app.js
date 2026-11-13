@@ -8,7 +8,7 @@
      * rendering      — every panel, with all server strings escaped
      * events         — append-only, driven by the monotonic `seq`
      * views          — Status / Hiscores / News in one page
-     * theme          — light | dark | ice, persisted in localStorage
+     * theme          — light | dark | oled, persisted in localStorage
      * toast + copy   — small quality-of-life helpers
 
    Contract: docs/WEB-API.md. Every request path is relative so the site keeps
@@ -30,8 +30,8 @@
   var MAX_EVENT_NODES = 40;     /* keep the DOM bounded */
 
   var THEME_KEY = 'dartscape.theme';
-  var THEMES = ['light', 'dark', 'ice'];
-  var THEME_COLORS = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
+  var THEMES = ['light', 'dark', 'oled'];
+  var THEME_COLORS = { light: '#45688e', dark: '#22374f', oled: '#000000' };
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -276,7 +276,7 @@
      ------------------------------------------------------------------------ */
 
   function themeValid(name) {
-    return name === 'light' || name === 'dark' || name === 'ice';
+    return name === 'light' || name === 'dark' || name === 'oled';
   }
 
   function getTheme() {
@@ -364,11 +364,12 @@
       data.startedAt ? 'since ' + fmtClock(data.startedAt) : 'since last restart');
 
     var tps = toNum(world.ticksPerSecond);
+    var tickMs = toNum(world.averageTickMs);
     setText(byId('stat-tick'), tps === null ? '—' : fmtDecimal(tps, 2) + ' tps');
     setText(byId('stat-tick-note'),
-      toNum(world.averageTickMs) === null
+      tickMs === null || tickMs <= 0
         ? 'game loop speed'
-        : fmtDecimal(world.averageTickMs, 1) + ' ms average tick');
+        : fmtDecimal(tickMs, 1) + ' ms average tick');
   }
 
   /* ------------------------------------------------------------------------
@@ -572,10 +573,13 @@
     rows.sort(function (a, b) { return b.total - a.total; });
     if (rows.length > 6) { rows = rows.slice(0, 6); }
 
-    var max = rows[0].total > 0 ? rows[0].total : 1;
+    var max = rows[0].total > 0 ? rows[0].total : 0;
     var html = '';
     for (var j = 0; j < rows.length; j++) {
-      var pct = Math.max(4, Math.round((rows[j].total / max) * 100));
+      /* A zero total gets a genuinely empty track, not a token sliver. */
+      var pct = max > 0 && rows[j].total > 0
+        ? Math.max(4, Math.round((rows[j].total / max) * 100))
+        : 0;
       html += '<div class="skill-row">' +
         '<div class="skill-top">' +
           '<span class="skill-name">' + esc(rows[j].skill) + '</span>' +

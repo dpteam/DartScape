@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Text;
 using DartScape.Core.Diagnostics;
@@ -18,7 +18,7 @@ namespace DartScape.Web
     /// </para>
     /// <para>
     /// Everything is optional. An empty or missing section produces an empty stylesheet,
-    /// which means the stock palette — that is the documented behaviour, and it is why
+    /// which means the stock palette вЂ” that is the documented behaviour, and it is why
     /// the file can be linked unconditionally.
     /// </para>
     /// </remarks>
@@ -56,7 +56,7 @@ namespace DartScape.Web
             // button that does not match anything.
             if (accent != null && accentDark == null) accentDark = Shade(accent, -0.22);
 
-            foreach (string theme in new[] { "light", "dark", "ice" })
+            foreach (string theme in new[] { "light", "dark", "oled" })
             {
                 css.Append("html[data-theme=\"").Append(theme).Append("\"]{");
 

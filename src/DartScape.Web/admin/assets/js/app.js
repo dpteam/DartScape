@@ -1,5 +1,5 @@
-/* ============================================================================
- * DartScape Admin — assets/js/app.js
+﻿/* ============================================================================
+ * DartScape Admin вЂ” assets/js/app.js
  * Role: all client behaviour for the LAN-only admin panel. Talks to the admin
  * API exactly as documented in docs/WEB-API.md using XMLHttpRequest and the
  * `Authorization: Bearer <token>` header. ES5 only, no frameworks, no build.
@@ -26,7 +26,7 @@
 
   var TOKEN_KEY = 'dartscape.admin.token';
   var THEME_KEY = 'dartscape.admin.theme';
-  var THEMES = ['light', 'dark', 'ice'];
+  var THEMES = ['light', 'dark', 'oled'];
   var TABS = { overview: true, players: true, console: true, logs: true, config: true };
   var NAV_ORDER = ['overview', 'players', 'console', 'logs', 'config'];
 
@@ -92,26 +92,26 @@
   }
 
   function fmtClock(unixSec) {
-    if (!unixSec) { return '—'; }
+    if (!unixSec) { return 'вЂ”'; }
     var d = new Date(unixSec * 1000);
     return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
   }
 
   function fmtDateTime(unixSec) {
-    if (!unixSec) { return '—'; }
+    if (!unixSec) { return 'вЂ”'; }
     var d = new Date(unixSec * 1000);
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
       ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
   function fmtDate(unixSec) {
-    if (!unixSec) { return '—'; }
+    if (!unixSec) { return 'вЂ”'; }
     var d = new Date(unixSec * 1000);
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
 
   function fmtDuration(sec) {
-    if (sec === null || sec === undefined || isNaN(sec)) { return '—'; }
+    if (sec === null || sec === undefined || isNaN(sec)) { return 'вЂ”'; }
     sec = Math.max(0, Math.floor(Number(sec)));
     var d = Math.floor(sec / 86400);
     var h = Math.floor((sec % 86400) / 3600);
@@ -124,7 +124,7 @@
   }
 
   function fmtIdle(sec) {
-    if (sec === null || sec === undefined || isNaN(sec)) { return '—'; }
+    if (sec === null || sec === undefined || isNaN(sec)) { return 'вЂ”'; }
     sec = Math.max(0, Math.floor(Number(sec)));
     if (sec < 60) { return sec + 's'; }
     if (sec < 3600) { return Math.floor(sec / 60) + 'm ' + (sec % 60) + 's'; }
@@ -132,7 +132,7 @@
   }
 
   function fmtNum(value) {
-    if (value === null || value === undefined || value === '') { return '—'; }
+    if (value === null || value === undefined || value === '') { return 'вЂ”'; }
     var num = Number(value);
     if (isNaN(num)) { return String(value); }
     var negative = num < 0;
@@ -142,13 +142,13 @@
   }
 
   function fmtFixed(value, places) {
-    if (typeof value !== 'number' || isNaN(value)) { return '—'; }
+    if (typeof value !== 'number' || isNaN(value)) { return 'вЂ”'; }
     return value.toFixed(places);
   }
 
   function setText(el, value) {
     if (!el) { return; }
-    el.textContent = (value === null || value === undefined) ? '—' : String(value);
+    el.textContent = (value === null || value === undefined) ? 'вЂ”' : String(value);
   }
 
   function addClass(el, cls) {
@@ -366,7 +366,7 @@
 
     state.busy.login = true;
     dom.loginSubmit.disabled = true;
-    dom.loginSubmit.textContent = 'Signing in…';
+    dom.loginSubmit.textContent = 'Signing inвЂ¦';
     setLoginStatus('', false);
 
     attemptLogin(token, function (err) {
@@ -428,7 +428,7 @@
     setConn('off');
     dom.rememberToken.checked = false;
     showLogin('Your token was rejected. Sign in again.');
-    toast('error', 'Session expired — sign in again.');
+    toast('error', 'Session expired вЂ” sign in again.');
   }
 
   function signOut() {
@@ -456,8 +456,8 @@
     dom.configSearch.value = '';
     state.playerFilter = '';
     dom.logCount.textContent = '0 lines';
-    dom.logStatus.textContent = 'Connecting…';
-    dom.configMeta.textContent = 'Read-only · secrets redacted';
+    dom.logStatus.textContent = 'ConnectingвЂ¦';
+    dom.configMeta.textContent = 'Read-only В· secrets redacted';
     dom.overviewUpdated.textContent = 'Waiting for data';
     dom.navPlayerCount.hidden = true;
     resetOverview();
@@ -483,8 +483,8 @@
 
     dom.rememberToken.checked = true;
     dom.loginSubmit.disabled = true;
-    dom.loginSubmit.textContent = 'Checking…';
-    setLoginStatus('Checking saved token…', true);
+    dom.loginSubmit.textContent = 'CheckingвЂ¦';
+    setLoginStatus('Checking saved tokenвЂ¦', true);
 
     attemptLogin(saved, function (err) {
       dom.loginSubmit.disabled = false;
@@ -533,7 +533,7 @@
 
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) {
-      meta.setAttribute('content', name === 'dark' ? '#16202c' : (name === 'ice' ? '#2c6f86' : '#4a76a8'));
+      meta.setAttribute('content', name === 'dark' ? '#16202c' : (name === 'oled' ? '#000000' : '#4a76a8'));
     }
   }
 
@@ -633,7 +633,7 @@
     var proc = data.process || {};
 
     setText(dom.ovUptime, fmtDuration(server.uptimeSec));
-    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDate(proc.startedAt) : 'since —');
+    setText(dom.ovStarted, proc.startedAt ? 'since ' + fmtDate(proc.startedAt) : 'since вЂ”');
     setText(dom.ovPlayers, fmtNum(world.playersOnline) + ' / ' + fmtNum(world.playersMax));
     setText(dom.ovAccountsStat, fmtNum(world.accountsTotal) + ' accounts');
     setText(dom.ovTickRate, fmtFixed(server.tickRate, 2));
@@ -642,9 +642,9 @@
     setText(dom.ovThreads, fmtNum(server.threads));
     setText(dom.ovRestarts, fmtNum(proc.restarts));
 
-    setText(dom.ovPid, (proc.pid === null || proc.pid === undefined) ? '—' : proc.pid);
+    setText(dom.ovPid, (proc.pid === null || proc.pid === undefined) ? 'вЂ”' : proc.pid);
     setText(dom.ovStartedAt, fmtDateTime(proc.startedAt));
-    setText(dom.ovLogFile, proc.logFile || '—');
+    setText(dom.ovLogFile, proc.logFile || 'вЂ”');
     setText(dom.ovGc, fmtNum(server.gcCollections));
     setText(dom.ovNpcs, fmtNum(world.npcs));
     setText(dom.ovGround, fmtNum(world.groundItems));
@@ -684,11 +684,11 @@
       'ovThreads', 'ovRestarts', 'ovPid', 'ovStartedAt', 'ovGc', 'ovNpcs',
       'ovGround', 'ovAccounts'];
     for (var i = 0; i < ids.length; i++) {
-      setText(dom[ids[i]], '—');
+      setText(dom[ids[i]], 'вЂ”');
     }
-    setText(dom.ovStarted, 'since —');
-    setText(dom.ovAccountsStat, '— accounts');
-    setText(dom.ovLogFile, '—');
+    setText(dom.ovStarted, 'since вЂ”');
+    setText(dom.ovAccountsStat, 'вЂ” accounts');
+    setText(dom.ovLogFile, 'вЂ”');
     dom.ovLastError.textContent = 'None recorded.';
     removeClass(dom.ovLastError, 'has-error');
     dom.ovServerState.textContent = 'Unknown';
@@ -738,7 +738,7 @@
       dom.playersEmpty.hidden = false;
       dom.playersEmpty.textContent = all.length === 0
         ? 'No players online.'
-        : 'No players match “' + raw + '”.';
+        : 'No players match вЂњ' + raw + 'вЂќ.';
     } else {
       dom.playersEmpty.hidden = true;
     }
@@ -751,7 +751,7 @@
     var tdName = document.createElement('td');
     tdName.className = 'cell-name';
     tdName.appendChild(document.createTextNode(
-      p.name === null || p.name === undefined ? '—' : String(p.name)
+      p.name === null || p.name === undefined ? 'вЂ”' : String(p.name)
     ));
 
     var priv = Number(p.privilege || 0);
@@ -766,14 +766,14 @@
     tr.appendChild(tdCell(fmtNum(p.combat), 'cell-num', 'Combat'));
     tr.appendChild(tdCell(fmtNum(p.totalLevel), 'cell-num', 'Level'));
 
-    var pos = '—';
+    var pos = 'вЂ”';
     if (p.x !== null && p.x !== undefined && p.y !== null && p.y !== undefined) {
-      pos = p.x + ', ' + p.y + (p.plane ? ' · P' + p.plane : '');
+      pos = p.x + ', ' + p.y + (p.plane ? ' В· P' + p.plane : '');
     }
     tr.appendChild(tdCell(pos, 'cell-mono', 'Pos'));
 
     tr.appendChild(tdCell(fmtDuration(p.sessionSec), 'cell-num', 'Session'));
-    tr.appendChild(tdCell(p.address || '—', 'cell-mono', 'Addr'));
+    tr.appendChild(tdCell(p.address || 'вЂ”', 'cell-mono', 'Addr'));
     tr.appendChild(tdCell(fmtIdle(p.idleSec), 'cell-num', 'Idle'));
 
     var tdActions = document.createElement('td');
@@ -859,7 +859,7 @@
     input.className = 'input';
     input.rows = 3;
     input.maxLength = 240;
-    input.placeholder = 'Hello…';
+    input.placeholder = 'HelloвЂ¦';
     input.addEventListener('keydown', function (e) {
       if ((e.ctrlKey || e.metaKey) && e.keyCode === 13) {
         e.preventDefault();
@@ -869,8 +869,8 @@
 
     var hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = 'Sent through the command dispatcher as “::msg ' + name +
-      ' <text>”, so the reply appears in the Console tab.';
+    hint.textContent = 'Sent through the command dispatcher as вЂњ::msg ' + name +
+      ' <text>вЂќ, so the reply appears in the Console tab.';
 
     wrap.appendChild(intro);
     wrap.appendChild(label);
@@ -1036,7 +1036,7 @@
 
     openConfirm({
       title: 'Broadcast to all players?',
-      message: '“' + text + '” will appear in every online player’s chat.',
+      message: 'вЂњ' + text + 'вЂќ will appear in every online playerвЂ™s chat.',
       confirmLabel: 'Send broadcast',
       onConfirm: function (done) {
         apiPost('api/admin/broadcast', { text: text }, function (err, data) {
@@ -1157,7 +1157,7 @@
       state.busy.logs = false;
 
       if (err) {
-        dom.logStatus.textContent = 'Paused — last request failed';
+        dom.logStatus.textContent = 'Paused вЂ” last request failed';
         return;
       }
 
@@ -1320,12 +1320,12 @@
       dom.configEmpty.hidden = false;
       dom.configEmpty.textContent = sections.length === 0
         ? 'No configuration entries.'
-        : 'No entries match “' + raw + '”.';
+        : 'No entries match вЂњ' + raw + 'вЂќ.';
     } else {
       dom.configEmpty.hidden = true;
     }
 
-    dom.configMeta.textContent = 'Read-only · secrets redacted · ' + shownEntries +
+    dom.configMeta.textContent = 'Read-only В· secrets redacted В· ' + shownEntries +
       (shownEntries === 1 ? ' entry' : ' entries');
   }
 
@@ -1454,7 +1454,7 @@
     var mark = document.createElement('span');
     mark.className = 'toast-mark';
     mark.setAttribute('aria-hidden', 'true');
-    mark.textContent = kind === 'success' ? '✓' : '!';
+    mark.textContent = kind === 'success' ? 'вњ“' : '!';
 
     var body = document.createElement('span');
     body.className = 'toast-text';

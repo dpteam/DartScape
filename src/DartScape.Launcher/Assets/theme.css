@@ -65,27 +65,30 @@ body.theme-dark .footer     { background: #1a202a; border-top: 1px solid #2f3f54
 body.theme-dark .worlds .row2 { border-bottom: 1px solid #232b37; }
 body.theme-dark .worlds .row2:hover { background: #232b37; }
 
-/* --- ice ---------------------------------------------------------------- */
+/* --- oled --------------------------------------------------------------- */
+/* True black throughout, so an OLED panel switches those pixels off. Text is
+   kept brighter than the dark theme: pure black next to mid-grey reads as
+   dimmer than it measures. */
 
-body.theme-ice {
-  background: #eaf4f8;
-  color: #1d3a44;
+body.theme-oled {
+  background: #000000;
+  color: #e8e8e8;
 }
 
-body.theme-ice .shell      { background: #eaf4f8; }
-body.theme-ice .titlebar   { background: #4aa3c4; border-bottom: 1px solid #2f7d99; }
-body.theme-ice .card       { background: #ffffff; border: 1px solid #b8dce8; }
-body.theme-ice .cardhead   { background: #e8f6fb; border-bottom: 1px solid #b8dce8; color: #1e7a96; }
-body.theme-ice .tabs       { background: #e8f6fb; border-bottom: 1px solid #b8dce8; }
-body.theme-ice .tab        { background: #e8f6fb; color: #2b5f70; border-right: 1px solid #b8dce8; }
-body.theme-ice .tab.active { background: #ffffff; color: #1e7a96; font-weight: bold; }
-body.theme-ice input[type=text],
-body.theme-ice input[type=password] { background: #ffffff; border: 1px solid #a8d4e2; color: #1d3a44; }
-body.theme-ice .btn        { background: #f2fbfe; border: 1px solid #b8dce8; color: #1d3a44; }
-body.theme-ice .btn:hover  { background: #e0f3f9; }
-body.theme-ice .footer     { background: #e8f6fb; border-top: 1px solid #b8dce8; color: #5a8290; }
-body.theme-ice .worlds .row2 { border-bottom: 1px solid #d9eef5; }
-body.theme-ice .worlds .row2:hover { background: #f2fbfe; }
+body.theme-oled .shell      { background: #000000; }
+body.theme-oled .titlebar   { background: #000000; border-bottom: 1px solid #1f1f1f; }
+body.theme-oled .card       { background: #000000; border: 1px solid #1f1f1f; }
+body.theme-oled .cardhead   { background: #0a0a0a; border-bottom: 1px solid #1f1f1f; color: #6fb3e0; }
+body.theme-oled .tabs       { background: #000000; border-bottom: 1px solid #1f1f1f; }
+body.theme-oled .tab        { background: #000000; color: #9a9a9a; border-right: 1px solid #1f1f1f; }
+body.theme-oled .tab.active { background: #0a0a0a; color: #6fb3e0; font-weight: bold; }
+body.theme-oled input[type=text],
+body.theme-oled input[type=password] { background: #0a0a0a; border: 1px solid #333333; color: #e8e8e8; }
+body.theme-oled .btn        { background: #0f0f0f; border: 1px solid #333333; color: #e8e8e8; }
+body.theme-oled .btn:hover  { background: #1a1a1a; }
+body.theme-oled .footer     { background: #000000; border-top: 1px solid #1f1f1f; color: #8a8a8a; }
+body.theme-oled .worlds .row2 { border-bottom: 1px solid #141414; }
+body.theme-oled .worlds .row2:hover { background: #0f0f0f; }
 
 /* --- layout ------------------------------------------------------------- */
 
@@ -267,7 +270,7 @@ body.theme-ice .worlds .row2:hover { background: #f2fbfe; }
 }
 
 body.theme-dark .launchbar { background: #1c222c; border-color: #2f3f54; }
-body.theme-ice  .launchbar { background: #ffffff; border-color: #b8dce8; }
+body.theme-oled .launchbar { background: #0a0a0a; border-color: #1f1f1f; }
 
 .play {
   width: 100%;
@@ -294,7 +297,7 @@ body.theme-ice  .launchbar { background: #ffffff; border-color: #b8dce8; }
 }
 
 body.theme-dark .status { color: #9aa8bb; }
-body.theme-ice  .status { color: #2b5f70; }
+body.theme-oled .status { color: #9a9a9a; }
 
 .status.error { color: #b93a2c; font-weight: bold; }
 .status.good  { color: #2f8f57; }

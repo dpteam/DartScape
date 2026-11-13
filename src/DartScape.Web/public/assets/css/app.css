@@ -5,7 +5,7 @@
 
    Contents
      01. Reset & base
-     02. Theme tokens  (:root, light, dark, ice)
+     02. Theme tokens  (:root, light, dark, oled)
      03. Layout
      04. Top bar
      05. Stats strip
@@ -317,67 +317,71 @@ html[data-theme="dark"] {
   --selection-fg: #f0f5fa;
 }
 
-html[data-theme="ice"] {
-  color-scheme: light;
+/* OLED: true black. Panels are #000 so an OLED panel switches those pixels off
+   entirely, which is the whole point of the theme. Contrast is deliberately
+   raised relative to the dark theme, because pure black next to mid-grey text
+   reads as lower contrast than it measures. */
+html[data-theme="oled"] {
+  color-scheme: dark;
 
-  --bg-page: #e6f4fa;
-  --bg-page-alt: #d6ecf6;
-  --bg-panel: #ffffff;
-  --bg-panel-head: #e4f5fc;
-  --bg-subtle: #f4fbfe;
-  --bg-inset: #eef8fd;
+  --bg-page: #000000;
+  --bg-page-alt: #050505;
+  --bg-panel: #000000;
+  --bg-panel-head: #0a0a0a;
+  --bg-subtle: #080808;
+  --bg-inset: #0d0d0d;
 
-  --border: #b4dced;
-  --border-strong: #8ec9e0;
-  --border-soft: #d3ecf6;
+  --border: #1f1f1f;
+  --border-strong: #333333;
+  --border-soft: #141414;
 
-  --text: #1e3a47;
-  --text-strong: #0d2a36;
-  --text-muted: #4f7488;
-  --text-faint: #57808f;
+  --text: #e8e8e8;
+  --text-strong: #ffffff;
+  --text-muted: #9a9a9a;
+  --text-faint: #8a8a8a;
 
-  --link: #0a6c90;
-  --link-hover: #074d68;
+  --link: #6fb3e0;
+  --link-hover: #94cdf2;
 
-  --accent: #2b9fc6;
-  --accent-strong: #0b6d91;
-  --accent-soft: #e0f4fc;
+  --accent: #4a90c4;
+  --accent-strong: #6fb3e0;
+  --accent-soft: #0a1a26;
 
-  --topbar-bg: #5cbde0;
-  --topbar-edge: #3f9dc0;
-  --topbar-text: #0d2a36;
-  --topbar-dim: #123a4c;
-  --topbar-hover: rgba(255, 255, 255, 0.34);
-  --topbar-active: rgba(255, 255, 255, 0.52);
-  --topbar-line: rgba(13, 42, 54, 0.20);
-  --topbar-pill-bg: rgba(255, 255, 255, 0.55);
-  --topbar-well: rgba(13, 42, 54, 0.10);
-  --topbar-shadow: rgba(13, 42, 54, 0.16);
+  --topbar-bg: #000000;
+  --topbar-edge: #1f1f1f;
+  --topbar-text: #e8e8e8;
+  --topbar-dim: #9a9a9a;
+  --topbar-hover: rgba(255, 255, 255, 0.08);
+  --topbar-active: rgba(255, 255, 255, 0.14);
+  --topbar-line: rgba(255, 255, 255, 0.10);
+  --topbar-pill-bg: rgba(255, 255, 255, 0.06);
+  --topbar-well: rgba(255, 255, 255, 0.04);
+  --topbar-shadow: rgba(0, 0, 0, 0.80);
 
-  --ok: #2f8f7a;
-  --ok-soft: #e2f5f1;
-  --warn: #a8811f;
-  --bad: #c2543f;
-  --bad-soft: #fdeeea;
+  --ok: #4ec98a;
+  --ok-soft: #062015;
+  --warn: #e0b44a;
+  --bad: #f0736a;
+  --bad-soft: #220b09;
 
   --gold: #f0cd6b;
   --gold-hover: #f8dc8c;
-  --gold-edge: #c9a848;
-  --navy: #123a4c;
+  --gold-edge: #8a7328;
+  --navy: #050d14;
 
-  --row-hover: #f0fafe;
-  --row-zebra: #f8fdff;
+  --row-hover: #0f0f0f;
+  --row-zebra: #070707;
 
-  --shadow: rgba(20, 80, 110, 0.12);
-  --inset-highlight: rgba(255, 255, 255, 0.90);
-  --page-glow: rgba(255, 255, 255, 0.75);
+  --shadow: rgba(0, 0, 0, 0.90);
+  --inset-highlight: rgba(255, 255, 255, 0.06);
+  --page-glow: rgba(255, 255, 255, 0.03);
 
-  --toast-bg: #17495c;
-  --toast-fg: #f2fbfe;
-  --toast-border: #0e3546;
+  --toast-bg: #111111;
+  --toast-fg: #ffffff;
+  --toast-border: #333333;
 
-  --selection-bg: #c8eaf7;
-  --selection-fg: #0d2a36;
+  --selection-bg: #1d3f56;
+  --selection-fg: #ffffff;
 }
 
 
@@ -1177,7 +1181,6 @@ html[data-theme="ice"] {
 .skill-bar span {
   display: block;
   height: 100%;
-  min-width: 2px;
   border-radius: 2px;
   background: var(--accent);
 }

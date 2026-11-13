@@ -1,4 +1,4 @@
-# DartScape — Web API contract
+﻿# DartScape вЂ” Web API contract
 
 This document is the contract between the DartScape services and the browser
 assets in `src/DartScape.Web/public`. Everything here is implemented by
@@ -10,7 +10,7 @@ assets in `src/DartScape.Web/public`. Everything here is implemented by
 |---|---|---|---|---|
 | `DartScape.Server` | 43594 | `0.0.0.0` | yes (TCP) | Game protocol |
 | `DartScape.Web` | 43595 | `0.0.0.0` | yes, via Nginx Proxy Manager | Public status site + JSON API |
-| `DartScape.Web --admin` | 43596 | `0.0.0.0` | **no** — LAN only | Admin panel + admin API |
+| `DartScape.Web --admin` | 43596 | `0.0.0.0` | **no** вЂ” LAN only | Admin panel + admin API |
 | `DartScape.Relay` | 43597 | `0.0.0.0` | yes (TCP) | NAT-hairpin byte relay |
 
 The public site is served at `https://rune.dartpower.xyz/`. Nginx Proxy Manager
@@ -41,7 +41,7 @@ Cheap liveness probe for Nginx Proxy Manager / uptime monitors.
 
 ### `GET api/status`
 
-Everything the status page renders in one call. Polled every 2–15 s.
+Everything the status page renders in one call. Polled every 2вЂ“15 s.
 
 ```json
 {
@@ -87,7 +87,7 @@ Everything the status page renders in one call. Polled every 2–15 s.
 nobody is online it is an empty array, never `null`.
 
 `events` is a rolling list of the last 20 world events, oldest first. `seq` is
-monotonic — the front-end appends only entries with `seq` greater than the last
+monotonic вЂ” the front-end appends only entries with `seq` greater than the last
 one it rendered.
 
 ### `GET api/worlds`
@@ -257,5 +257,5 @@ ones, and it must work when the page is served from a sub-path.
   origin. Everything must still render without it.
 * CSS custom properties are fine (the *server* is the XP constraint, not the
   browser), but every theme must also degrade to a readable page.
-* Themes: `light`, `dark`, `ice`. Selected via `<html data-theme="...">`,
+* Themes: `light`, `dark`, `oled`. Selected via `<html data-theme="...">`,
   persisted in `localStorage` under `dartscape.theme`.

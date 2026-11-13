@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 
@@ -167,7 +167,7 @@ namespace DartScape.Launcher
             if (settings.Width < 640) settings.Width = 765;
             if (settings.Height < 480) settings.Height = 503;
             if (string.IsNullOrEmpty(settings.Server)) settings.Server = DefaultServer;
-            if (settings.Theme != "light" && settings.Theme != "dark" && settings.Theme != "ice") settings.Theme = "light";
+            if (settings.Theme != "light" && settings.Theme != "dark" && settings.Theme != "oled") settings.Theme = "light";
 
             return settings;
         }

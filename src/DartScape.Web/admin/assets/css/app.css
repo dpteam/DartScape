@@ -1,5 +1,5 @@
-/* ============================================================================
- * DartScape Admin вЂ” assets/css/app.css
+﻿/* ============================================================================
+ * DartScape Admin РІР‚вЂќ assets/css/app.css
  * Role: complete visual layer for the LAN-only admin panel. Dense, utilitarian
  * take on the public site's 2008 social-network language: blue chrome, white
  * panels, compact system fonts. Three themes driven by <html data-theme>.
@@ -118,7 +118,7 @@ svg {
   --shadow-lg: 0 12px 34px rgba(8, 18, 30, .35);
 }
 
-/* Light вЂ” the default 2008 web look. */
+/* Light РІР‚вЂќ the default 2008 web look. */
 html[data-theme="light"] {
   color-scheme: light;
   --bg: #e8eef6;
@@ -168,7 +168,7 @@ html[data-theme="light"] {
   --scroll-hover: #a9bcd0;
 }
 
-/* Dark вЂ” low-light operations. */
+/* Dark РІР‚вЂќ low-light operations. */
 html[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0f1319;
@@ -220,54 +220,56 @@ html[data-theme="dark"] {
   --shadow-lg: 0 12px 34px rgba(0, 0, 0, .55);
 }
 
-/* Ice вЂ” pale cyan variant for bright rooms. */
-html[data-theme="ice"] {
-  color-scheme: light;
-  --bg: #e4f3f9;
-  --bg-grad: linear-gradient(#eef9fd, #d9eef6);
-  --panel: #ffffff;
-  --panel-alt: #f2fbfe;
-  --panel-head: #e2f4fa;
-  --chrome: #2c6f86;
-  --chrome-2: #235c70;
-  --chrome-text: #f4fdff;
-  --text: #123240;
-  --text-strong: #08222d;
-  --muted: #577f8f;
-  --border: #bcdde8;
-  --border-strong: #95c4d5;
-  --accent: #0f6f8c;
+/* OLED: true black, for a panel where #000 pixels are switched off entirely.
+   Contrast is raised versus the dark theme because pure black beside mid-grey
+   reads as dimmer than it measures. */
+html[data-theme="oled"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --bg-grad: linear-gradient(#000000, #000000);
+  --panel: #000000;
+  --panel-alt: #080808;
+  --panel-head: #0a0a0a;
+  --chrome: #000000;
+  --chrome-2: #000000;
+  --chrome-text: #e8e8e8;
+  --text: #e8e8e8;
+  --text-strong: #ffffff;
+  --muted: #9a9a9a;
+  --border: #1f1f1f;
+  --border-strong: #333333;
+  --accent: #4a90c4;
   --accent-text: #ffffff;
-  --accent-soft: #d9f0f8;
-  --hover: #eaf7fc;
-  --gold: #c99a26;
-  --gold-text: #332400;
-  --ok: #1e7a58;
-  --ok-soft: #dff3ea;
-  --warn: #94660f;
-  --warn-soft: #fdf2da;
-  --err: #ab3535;
-  --err-soft: #fbe4e4;
-  --danger-bg: #ab3535;
+  --accent-soft: #0a1a26;
+  --hover: #0f0f0f;
+  --gold: #f0cd6b;
+  --gold-text: #1a1200;
+  --ok: #4ec98a;
+  --ok-soft: #062015;
+  --warn: #e0b44a;
+  --warn-soft: #1d1503;
+  --err: #f0736a;
+  --err-soft: #220b09;
+  --danger-bg: #c4453c;
   --danger-text: #ffffff;
-  --btn-bg: #f4fcfe;
-  --btn-bg-hover: #e2f4fa;
-  --btn-primary-bg: #2c6f86;
-  --btn-primary-bg-2: #235c70;
-  --btn-primary-text: #f4fdff;
-  --focus: #1d90b5;
-  --input-bg: #ffffff;
-  --log-bg: #f4fbfd;
-  --log-text: #173847;
-  --log-warn-bg: #fdf7e9;
-  --log-err-bg: #fceeee;
-  --console-bg: #0d2029;
-  --console-text: #cfe9f2;
-  --console-dim: #7fa3b0;
-  --row-alt: #f5fbfd;
-  --overlay: rgba(10, 40, 52, .5);
-  --scroll: #b3d6e2;
-  --scroll-hover: #94c3d2;
+  --btn-bg: #0f0f0f;
+  --btn-bg-hover: #1a1a1a;
+  --btn-primary-bg: #2b5c80;
+  --btn-primary-bg-2: #1e425c;
+  --btn-primary-text: #ffffff;
+  --focus: #6fb3e0;
+  --input-bg: #0a0a0a;
+  --log-bg: #050505;
+  --log-text: #d8d8d8;
+  --log-warn-bg: #1a1405;
+  --log-err-bg: #1e0a08;
+  --console-bg: #000000;
+  --console-text: #d8e8f0;
+  --console-dim: #6f8894;
+  --row-alt: #070707;
+  --overlay: rgba(0, 0, 0, .82);
+  --scroll: #2a2a2a;
+  --scroll-hover: #3a3a3a;
 }
 
 /* 3. APP LAYOUT ---------------------------------------------------------- */
@@ -435,7 +437,7 @@ html[data-theme="ice"] {
 
 .swatch-light { background: linear-gradient(#ffffff, #cfdcea); }
 .swatch-dark { background: linear-gradient(#2a3644, #121820); }
-.swatch-ice { background: linear-gradient(#e6f7fd, #8fd0e2); }
+.swatch-oled { background: linear-gradient(#1a1a1a, #000000); }
 
 /* 5. SIDEBAR / BOTTOM NAV ------------------------------------------------ */
 

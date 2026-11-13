@@ -13,8 +13,8 @@
    --------------------------------------------------------------------------- */
 
 (function () {
-  var THEMES = ['light', 'dark', 'ice'];
-  var COLOURS = { light: '#45688e', dark: '#22374f', ice: '#5cbde0' };
+  var THEMES = ['light', 'dark', 'oled'];
+  var COLOURS = { light: '#45688e', dark: '#22374f', oled: '#000000' };
 
   var theme;
 

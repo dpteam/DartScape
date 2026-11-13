@@ -1,4 +1,4 @@
-# DartScape — pipeline
+﻿# DartScape вЂ” pipeline
 
 What is done, what is missing, and in what order the missing pieces should be
 built. This document is the plan of record; if it disagrees with the code, the
@@ -58,7 +58,7 @@ code is right and this file is stale.
 | Admin panel | overview, players, console, log tail, config view |
 | Auth | bearer token, constant-time compare, per-IP lockout, LAN-only |
 | Static | MIME whitelist, traversal guards, ETag/304, cache policy |
-| Themes | light, dark, ice on both surfaces |
+| Themes | light, dark, oled on both surfaces |
 
 ### Relay
 
@@ -76,7 +76,7 @@ third-party packages and no development leftovers.
 
 ## Missing, in build order
 
-### 1. Collision and pathfinding — highest value
+### 1. Collision and pathfinding вЂ” highest value
 
 **Why first:** everything that moves currently walks through walls, and a world
 where you can walk through a wall does not feel like a world.
@@ -85,7 +85,7 @@ What exists: `Position`, `Direction`, a naive straight-line `WalkTo`.
 
 What is needed:
 
-* Load the landscape from cache store 3 (map index → terrain + objects).
+* Load the landscape from cache store 3 (map index в†’ terrain + objects).
 * Build a per-region `CollisionMap`: blocked tiles, blocked directions,
   object footprints by size.
 * Replace `WalkTo` with A* over the collision map, with the 317 rule that a
@@ -140,7 +140,7 @@ What is needed:
 What exists: nothing.
 
 What needs to happen: the cache carries MIDI and sound effects (store 4).
-MIDI playback on .NET 4.0 is possible via `winmm.dll` (`midiOutOpen` family) —
+MIDI playback on .NET 4.0 is possible via `winmm.dll` (`midiOutOpen` family) вЂ”
 that is a DllImport the XP check already allows. Sound effects need a WAV
 decoder and `waveOut`. Both are small and self-contained; both are optional
 polish.
@@ -176,7 +176,7 @@ What exists: a starter kit, a tiny item-combination table, and 60 NPCs spawned
 around the start point.
 
 What is needed: NPC spawn tables, shop stock, quest data, drop tables. All of it
-is data, none of it is engine work — which is exactly why the engine had to come
+is data, none of it is engine work вЂ” which is exactly why the engine had to come
 first.
 
 ---
@@ -185,7 +185,7 @@ first.
 
 * **Combat is melee only.** The formulas are authentic; the variety is not.
 * **NPC stats are derived from combat level.** The cache does not carry
-  hitpoints, attack or defence — those lived in the original server's spawn
+  hitpoints, attack or defence вЂ” those lived in the original server's spawn
   tables. `DefinitionLoader.ApplyDerivedNpcStats` invents plausible values.
 * **The world has no map.** Terrain is a deterministic hash, not landscape data.
   The start point is the real Lumbridge coordinate and the NPCs are real
@@ -214,7 +214,7 @@ tools\package.ps1
 
 `build.cmd` is the normal entry point: it builds everything, stages a runnable
 instance into `bin\`, and runs the tests. The `bin\` folder is the development
-world — config, keys, accounts and characters live there and survive a rebuild.
+world вЂ” config, keys, accounts and characters live there and survive a rebuild.
 
 The test suite is the fastest way to know a change is safe: it covers the wire
 format, the crypto, the cache and the game model, and it runs in under two

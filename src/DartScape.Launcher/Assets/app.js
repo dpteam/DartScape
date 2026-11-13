@@ -1,4 +1,4 @@
-/* ---------------------------------------------------------------------------
+﻿/* ---------------------------------------------------------------------------
    DartScape launcher script.
 
    Runs inside MSHTML, so this is ES3 with a few ES5 conveniences that IE8+
@@ -163,7 +163,7 @@ var Launcher = (function () {
   /* ---------------------------------------------------------------- themes */
 
   function setTheme(name) {
-    if (name !== 'light' && name !== 'dark' && name !== 'ice') name = 'light';
+    if (name !== 'light' && name !== 'dark' && name !== 'oled') name = 'light';
     state.theme = name;
     document.body.className = 'theme-' + name;
 
@@ -172,7 +172,7 @@ var Launcher = (function () {
   }
 
   function cycleTheme() {
-    var order = ['light', 'dark', 'ice'];
+    var order = ['light', 'dark', 'oled'];
     var next = order[(indexOf(order, state.theme) + 1) % order.length];
     setTheme(next);
   }
